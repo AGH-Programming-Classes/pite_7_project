@@ -1,0 +1,8 @@
+window:
+  width: 1200
+  height: 800
+panel:
+  width: 700
+  height: 700
+  x: 50
+  y: 50
