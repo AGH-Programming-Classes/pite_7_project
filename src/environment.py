@@ -17,29 +17,31 @@ class Environment:
     def __init__(self, grid_width: int, grid_height: int):
         self.tick_counter = 0
         self.running = True
-        
+
         self.grid_width = grid_width
         self.grid_height = grid_height
         self.grid = self._create_empty_grid()
-        
+
         self.food_sources = []
         self.food_items = []
         self._spawn_initial_food_sources()
-        
+
+        self.data_lock = threading.Lock()
+
         self.simulation_thread = threading.Thread(target=self._simulation_loop)
         self.simulation_thread.start()
-        
+
     def _create_empty_grid(self):
         """Create a simple 2D grid initialized to 0."""
         return [
             [0 for _ in range(self.grid_width)] for _ in range(self.grid_height)
         ]
-         
 
     def _spawn_initial_food_sources(self):
-        mid_x = self.grid_width // 2
-        mid_y = self.grid_height // 2
-        
+        """Spawn initial food sources at predefined locations."""
+        mid_x = self.grid_width // 2 + 1
+        mid_y = self.grid_height // 2 + 1
+
         spawn_locations = [
             (mid_x, mid_y),
             (mid_x - 2, mid_y - 2),
@@ -52,31 +54,34 @@ class Environment:
             if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
                 grass_patch = SimpleGrassPatch(
                     position=(x, y),
-                    area_id=1 # Default Area ID
+                    area_id=1  # Default Area ID
                 )
                 self.food_sources.append(grass_patch)
 
     def _simulation_loop(self):
+        """Main simulation loop running in a separate thread."""
         while self.running:
-            self.tick_counter += 1
+            with self.data_lock:
+                self.tick_counter += 1
 
-            new_food_items = []
-            for source in self.food_sources:
-                dropped_food = source.update()
-                if dropped_food:
-                    new_food_items.append(dropped_food)
+                new_food_items = []
+                for source in self.food_sources:
+                    dropped_food = source.update()
+                    if dropped_food:
+                        new_food_items.append(dropped_food)
 
-            self.food_items.extend(new_food_items)
+                self.food_items.extend(new_food_items)
 
-            food_to_keep = []
-            for food in self.food_items:
-                if not food.update():
-                    food_to_keep.append(food)
-            self.food_items = food_to_keep
+                food_to_keep = []
+                for food in self.food_items:
+                    if not food.update():
+                        food_to_keep.append(food)
+                self.food_items = food_to_keep
 
             time.sleep(0.01)
 
     def set_grid_cell(self, x: int, y: int, value: int):
+        """Set the value of a grid cell at position (x, y)."""
         if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
             self.grid[y][x] = value
 
@@ -85,7 +90,11 @@ class Environment:
         Function called every app tick to render.
         This is where the actual simulation should be displayed.
         """
-        
+        with self.data_lock:
+            tick_count = self.tick_counter
+            food_sources = list(self.food_sources)
+            food_items = list(self.food_items)
+
         for y in range(self.grid_height):
             for x in range(self.grid_width):
                 cell_rect = pygame.Rect(
@@ -94,27 +103,27 @@ class Environment:
                     cell_size,
                     cell_size
                 )
-                
+
                 if (x + y) % 2 == 0:
                     cell_color = (50, 50, 50)
                 else:
                     cell_color = (40, 40, 40)
-        
+
                 pygame.draw.rect(window, cell_color, cell_rect)
                 pygame.draw.rect(window, (70, 70, 70), cell_rect, 1)
 
-        for source in self.food_sources:
+        for source in food_sources:
             source.render(window, cell_size)
-        for food in self.food_items:
+        for food in food_items:
             food.render(window, cell_size)
 
         font = pygame.font.Font(None, 32)
-        tick_text = font.render(f"Ticks: {self.tick_counter}", True, (255, 255, 255))
-        food_count_text = font.render(f"Food items: {len(self.food_items)}", True, (255, 255, 255))
+        tick_text = font.render(f"Ticks: {tick_count}", True, (255, 255, 255))
+        food_count_text = font.render(f"Food items: {len(food_items)}", True, (255, 255, 255))
 
         window.blit(tick_text, (panel_x + 10, panel_y + 10))
         window.blit(food_count_text, (panel_x + 10, panel_y + 90))
-        
+
     def shutdown(self):
         """Tear down logic called before application exit."""
         self.running = False

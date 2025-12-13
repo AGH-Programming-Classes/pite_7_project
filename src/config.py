@@ -1,11 +1,10 @@
 """Configuration module for the simulation."""
 
 import yaml
-from typing import Any
 
 with open("config.yaml", encoding="utf-8") as f:
     cfg = yaml.safe_load(f)
-    
+
 WINDOW_WIDTH = cfg["window"]["width"]
 WINDOW_HEIGHT = cfg["window"]["height"]
 

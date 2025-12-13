@@ -30,16 +30,16 @@ while running:
         manager.process_events(event)
 
     manager.update(dt)
-    
+
     screen.fill((20, 20, 20)) # Clear screen
-    
+
     env.render(
         window=screen,
         panel_x=config.PANEL_X,
         panel_y=config.PANEL_Y,
         cell_size=config.CELL_SIZE
     )
-    
+
     manager.draw_ui(screen)
     pygame.display.flip()
 
