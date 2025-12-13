@@ -1,0 +1,45 @@
+name: Autoformat
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip-ical]')"
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install isort and autopep8
+        run: pip install isort autopep8
+
+      - name: Apply
+        run: |
+          # imports sorting
+          isort src/ --atomic --profile=black --dont-add-imports
+          # whitespace, blank lines, EOF
+          autopep8 src/ --in-place --aggressive 0 \
+              --select=W291,W292,W293,W391,E301,E302
+
+      - name: Commit
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes to commit."
+            exit 0
+          fi
+
+          git config user.name "autoformatter-bot"
+          git config user.email "autoformatter@users.noreply.github.com"
+          git add src/
+          git commit -m "auto-format job [no-autoformat]"
+          git push
