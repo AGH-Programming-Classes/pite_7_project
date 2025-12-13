@@ -57,13 +57,12 @@ class FoodSource(ABC):
 class SimpleGrassPatch(FoodSource):
     """A simple herbivore food source that regenerates and periodically drops food."""
 
-    def __init__(self, position: tuple, area_id: int, cell_size: int):
+    def __init__(self, position: tuple, area_id: int):
         super().__init__(position, area_id)
         self.food_left = 100          # Initial capacity
         self.max_capacity = 100
         self.production_interval = 100 # Drops food every 100 ticks
         self.tick_count = 0
-        self.cell_size = cell_size
 
     def update(self) -> Food | None:
         """Regenerates the source and occasionally drops a Food object."""
