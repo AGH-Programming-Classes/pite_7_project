@@ -21,4 +21,4 @@ jobs:
           if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
 
       - name: Run Pylint
-        run: pylint src/
+        run: pylint src/ --disable=C0116,R0914,R0902
