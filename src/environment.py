@@ -38,7 +38,6 @@ class Environment:
         ]
 
     def _spawn_initial_food_sources(self):
-        """Spawn initial food sources at predefined locations."""
         mid_x = self.grid_width // 2 + 1
         mid_y = self.grid_height // 2 + 1
 
@@ -59,7 +58,6 @@ class Environment:
                 self.food_sources.append(grass_patch)
 
     def _simulation_loop(self):
-        """Main simulation loop running in a separate thread."""
         while self.running:
             with self.data_lock:
                 self.tick_counter += 1
@@ -81,7 +79,6 @@ class Environment:
             time.sleep(0.01)
 
     def set_grid_cell(self, x: int, y: int, value: int):
-        """Set the value of a grid cell at position (x, y)."""
         if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
             self.grid[y][x] = value
 
@@ -91,41 +88,38 @@ class Environment:
         This is where the actual simulation should be displayed.
         """
         with self.data_lock:
-            tick_count = self.tick_counter
-            food_sources = list(self.food_sources)
-            food_items = list(self.food_items)
+            for y in range(self.grid_height):
+                for x in range(self.grid_width):
+                    cell_rect = pygame.Rect(
+                        panel_x + x * cell_size,
+                        panel_y + y * cell_size,
+                        cell_size,
+                        cell_size
+                    )
 
-        for y in range(self.grid_height):
-            for x in range(self.grid_width):
-                cell_rect = pygame.Rect(
-                    panel_x + x * cell_size,
-                    panel_y + y * cell_size,
-                    cell_size,
-                    cell_size
-                )
+                    if (x + y) % 2 == 0:
+                        cell_color = (50, 50, 50)
+                    else:
+                        cell_color = (40, 40, 40)
 
-                if (x + y) % 2 == 0:
-                    cell_color = (50, 50, 50)
-                else:
-                    cell_color = (40, 40, 40)
+                    pygame.draw.rect(window, cell_color, cell_rect)
+                    pygame.draw.rect(window, (70, 70, 70), cell_rect, 1)
 
-                pygame.draw.rect(window, cell_color, cell_rect)
-                pygame.draw.rect(window, (70, 70, 70), cell_rect, 1)
+            for source in self.food_sources:
+                source.render(window, cell_size)
+            for food in self.food_items:
+                food.render(window, cell_size)
 
-        for source in food_sources:
-            source.render(window, cell_size)
-        for food in food_items:
-            food.render(window, cell_size)
+            font = pygame.font.Font(None, 32)
+            tick_text = font.render(f"Ticks: {self.tick_counter}", True, (255, 255, 255))
+            food_count_text = font.render(
+                f"Food items: {len(self.food_items)}", True, (255, 255, 255)
+            )
 
-        font = pygame.font.Font(None, 32)
-        tick_text = font.render(f"Ticks: {tick_count}", True, (255, 255, 255))
-        food_count_text = font.render(f"Food items: {len(food_items)}", True, (255, 255, 255))
-
-        window.blit(tick_text, (panel_x + 10, panel_y + 10))
-        window.blit(food_count_text, (panel_x + 10, panel_y + 90))
+            window.blit(tick_text, (panel_x + 10, panel_y + 10))
+            window.blit(food_count_text, (panel_x + 10, panel_y + 90))
 
     def shutdown(self):
-        """Tear down logic called before application exit."""
         self.running = False
         if self.simulation_thread.is_alive():
             self.simulation_thread.join(timeout=1.0)
