@@ -2,8 +2,10 @@
 
 import threading
 import time
+import random
 import pygame
 from food import SimpleGrassPatch
+from agent import Agent
 
 
 class Environment:
@@ -14,7 +16,7 @@ class Environment:
     This should also expose all things that the user could do (like a button hit)
     This itself shouldn't really take any inputs (as in not have buttons and such)
     """
-    def __init__(self, grid_width: int, grid_height: int):
+    def __init__(self, grid_width: int, grid_height: int, pixel_width: int, pixel_height: int):
         self.tick_counter = 0
         self.running = True
 
@@ -22,9 +24,15 @@ class Environment:
         self.grid_height = grid_height
         self.grid = self._create_empty_grid()
 
+        self.pixel_width = pixel_width
+        self.pixel_height = pixel_height
+
         self.food_sources = []
         self.food_items = []
         self._spawn_initial_food_sources()
+
+        self.agents = []
+        self._spawn_initial_agents()
 
         self.data_lock = threading.Lock()
 
@@ -57,6 +65,16 @@ class Environment:
                 )
                 self.food_sources.append(grass_patch)
 
+    def _spawn_initial_agents(self):
+        Agent.bound_x = self.pixel_width
+        Agent.bound_y = self.pixel_height
+
+        for _ in range(5):
+            pos_x = random.randint(0, Agent.bound_x)
+            pos_y = random.randint(0, Agent.bound_y)
+            agent = Agent((pos_x, pos_y))
+            self.agents.append(agent)
+
     def _simulation_loop(self):
         while self.running:
             with self.data_lock:
@@ -75,6 +93,9 @@ class Environment:
                     if not food.update():
                         food_to_keep.append(food)
                 self.food_items = food_to_keep
+
+                for agent in self.agents:
+                    agent.update()
 
             time.sleep(0.01)
 
@@ -109,6 +130,9 @@ class Environment:
                 source.render(window, cell_size)
             for food in self.food_items:
                 food.render(window, cell_size)
+
+            for agent in self.agents:
+                agent.render(window, cell_size, (panel_x, panel_y))
 
             font = pygame.font.Font(None, 32)
             tick_text = font.render(f"Ticks: {self.tick_counter}", True, (255, 255, 255))
