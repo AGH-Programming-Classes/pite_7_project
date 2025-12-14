@@ -45,7 +45,7 @@ class FoodSource(ABC):
 
 
     @abstractmethod
-    def render(self, window, cell_size: int):
+    def render(self, window, cell_size: int, food_items: list, panel_offset: tuple):
         """Renders the food source."""
 
 
@@ -57,13 +57,21 @@ class FoodSource(ABC):
 class SimpleGrassPatch(FoodSource):
     """A simple herbivore food source that regenerates and periodically drops food."""
 
+    FONT = None
+
     def __init__(self, position: tuple, area_id: int):
         super().__init__(position, area_id)
         self.food_left = 100 # Initial capacity
         self.max_capacity = 100
         self.production_interval = 100 # Drops food every 100 ticks
         self.tick_count = 0
-        self.font = pygame.font.Font(None, 14)
+
+    @classmethod
+    def get_font(cls):
+        """Return a shared pygame Font instance"""
+        if cls.FONT is None:
+            cls.FONT = pygame.font.Font(None, 14)
+        return cls.FONT
 
     def update(self) -> Food | None:
         """Regenerates the source and occasionally drops a Food object."""
@@ -89,10 +97,15 @@ class SimpleGrassPatch(FoodSource):
 
         return None
 
-    def render(self, window, cell_size: int, food_items: list, panel_x: int, panel_y: int):
+    def render(self, window, cell_size: int, food_items: list, panel_offset: tuple):
         """Renders the grass patch (source) and displays the count of active food items."""
 
-        rect = pygame.Rect(panel_x + self.x * cell_size, panel_y + self.y * cell_size, cell_size, cell_size)
+        panel_x, panel_y = panel_offset
+        rect = pygame.Rect(panel_x + self.x * cell_size
+                           , panel_y + self.y * cell_size,
+                           cell_size,
+                           cell_size
+                        )
         capacity_ratio = self.food_left / self.max_capacity
         r = 50 + int(50 * capacity_ratio)
         g = 150 + int(100 * capacity_ratio)
@@ -105,7 +118,7 @@ class SimpleGrassPatch(FoodSource):
         )
 
         if food_count > 0:
-            food_count_surface = self.font.render(
+            food_count_surface = self.get_font().render(
                 f"{food_count}",
                 True,
                 (0, 200, 0)
