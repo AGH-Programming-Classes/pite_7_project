@@ -5,6 +5,7 @@ import math
 import pygame
 
 class Agent:
+    """Represents agent that can interact with environment"""
     bound_x = 0 # environment size
     bound_y = 0
 
@@ -22,7 +23,7 @@ class Agent:
         new_y = self.y - math.sin(rad) * self.speed
 
         self._check_bounds((new_x, new_y), new_angle)
-            
+
     def _check_bounds(self, new_position: tuple, new_angle: int):
         """Keeps agent within bounds"""
         new_x, new_y = new_position
