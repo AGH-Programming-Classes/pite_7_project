@@ -106,7 +106,7 @@ class Environment:
                     pygame.draw.rect(window, (70, 70, 70), cell_rect, 1)
 
             for source in self.food_sources:
-                source.render(window, cell_size,self.food_items, panel_x, panel_y)
+                source.render(window, cell_size, self.food_items, (panel_x, panel_y))
             for food in self.food_items:
                 food.render(window, cell_size, panel_x, panel_y)
 
