@@ -15,7 +15,9 @@ manager = pygame_gui.UIManager((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
 
 env = Environment(
     grid_width=config.GRID_WIDTH,
-    grid_height=config.GRID_HEIGHT
+    grid_height=config.GRID_HEIGHT,
+    pixel_width=config.PANEL_WIDTH,
+    pixel_height=config.PANEL_HEIGHT
 )
 
 running = True
