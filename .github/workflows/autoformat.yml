@@ -26,10 +26,9 @@ jobs:
       - name: Apply
         run: |
           # imports sorting
-          isort src/ --atomic --profile=black --dont-add-imports
+          isort src/ --atomic --profile=black
           # whitespace, blank lines, EOF
-          autopep8 src/ --in-place --aggressive 0 \
-              --select=W291,W292,W293,W391,E301,E302
+          autopep8 src -r --in-place --select=W291,W292,W293,W391,E301,E302
 
       - name: Commit
         run: |
