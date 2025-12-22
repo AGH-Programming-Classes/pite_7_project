@@ -117,8 +117,8 @@ class SimpleGrassPatch(FoodSource):
         if self.is_destroyed:
             return
         panel_x, panel_y = panel_offset
-        rect = pygame.Rect(panel_x + self.x * cell_size
-                           , panel_y + self.y * cell_size,
+        rect = pygame.Rect(panel_x + self.x * cell_size, 
+                           panel_y + self.y * cell_size,
                            cell_size,
                            cell_size
                         )
@@ -277,8 +277,8 @@ class FertileFruitTree(FoodSource):
         panel_x, panel_y = panel_offset
         rect = pygame.Rect(panel_x + self.x * cell_size,
                             panel_y + self.y * cell_size,
-                              cell_size,
-                                cell_size)
+                            cell_size,
+                            cell_size)
         capacity_ratio = self.food_left / self.max_capacity
         r = 100 + int(50 * capacity_ratio)
         g = 180 + int(50 * capacity_ratio)
@@ -346,8 +346,8 @@ class CactusPads(FoodSource):
         panel_x, panel_y = panel_offset
         rect = pygame.Rect(panel_x + self.x * cell_size,
                             panel_y + self.y * cell_size,
-                              cell_size,
-                                cell_size)
+                            cell_size,
+                            cell_size)
         capacity_ratio = self.food_left / self.max_capacity
         r = 180 + int(20 * capacity_ratio)
         g = 150 + int(30 * capacity_ratio)
