@@ -30,29 +30,10 @@ class Environment:
         self.food_sources = []
         self.food_items = []
         self.areas = {
-            1: Area(1, "Plains",
-                     agent_speed_modifier=1.0,
-                       food_regen_modifier=1.2,
-                         expansion_chance=0.003,
-                           color=(60,120,60)),
-            2: Area(2,
-                     "Fertile Valley",
-                       agent_speed_modifier=0.9,
-                         food_regen_modifier=1.5,
-                           expansion_chance=0.001,
-                             color=(80,160,80)),
-            3: Area(3,
-                     "Desert",
-                       agent_speed_modifier=1.2,
-                         food_regen_modifier=0.5,
-                           expansion_chance=0.0005,
-                             color=(200,180,50)),
-            4: Area(4,
-                     "Berry Corner",
-                       agent_speed_modifier=1.0,
-                         food_regen_modifier=1.2,
-                           expansion_chance=0.007,
-                             color=(180,100,255))
+            1: Area.PLAINS,
+            2: Area.FERTILE_VALLEY,
+            3: Area.DESERT,
+            4: Area.BERRY_CORNER
         }
 
         self._spawn_initial_food_sources()
@@ -170,6 +151,7 @@ class Environment:
                             self.food_sources.append(new_source)
                             source.area.current_food_sources += 1
 
+                self.food_sources = [fs for fs in self.food_sources if not fs.is_destroyed]
                 self.food_items.extend(new_food_items)
 
                 food_to_keep = []
