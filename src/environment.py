@@ -121,6 +121,7 @@ class Environment:
                     if x_min <= x <= x_max and y_min <= y <= y_max:
                         if not self.is_food_source_at(x, y):
                             self.food_sources.append(cls(position=(x, y), area=area))
+                            area.current_food_sources += 1
 
 
 
