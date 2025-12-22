@@ -4,7 +4,7 @@ import threading
 import time
 import random
 import pygame
-from food import SimpleGrassPatch,Food,BerryBush,FertileFruitTree,CactusPads
+from food import SimpleGrassPatch, Food, BerryBush, FertileFruitTree, CactusPads
 from agent import Agent
 from area import Area
 
