@@ -133,7 +133,7 @@ class SimpleGrassPatch(FoodSource):
             if food.x == self.x and food.y == self.y
         )
 
-        if food_count >= 0:
+        if food_count > 0:
             food_count_surface = self.get_font().render(
                 f"{food_count}",
                 True,
