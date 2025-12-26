@@ -117,7 +117,7 @@ class SimpleGrassPatch(FoodSource):
         if self.is_destroyed:
             return
         panel_x, panel_y = panel_offset
-        rect = pygame.Rect(panel_x + self.x * cell_size, 
+        rect = pygame.Rect(panel_x + self.x * cell_size,
                            panel_y + self.y * cell_size,
                            cell_size,
                            cell_size

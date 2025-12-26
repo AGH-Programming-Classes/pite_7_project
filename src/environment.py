@@ -41,6 +41,10 @@ class Environment:
         self.agents = []
         self._spawn_initial_agents()
 
+        self.area_food_sources = {
+            area: 0 for area in Area
+        }
+
         self.data_lock = threading.Lock()
 
         self.simulation_thread = threading.Thread(target=self._simulation_loop)
@@ -102,7 +106,7 @@ class Environment:
                     if x_min <= x <= x_max and y_min <= y <= y_max:
                         if not self.is_food_source_at(x, y):
                             self.food_sources.append(cls(position=(x, y), area=area))
-                            area.current_food_sources += 1
+                            self.area_food_sources[area] += 1
 
 
 
@@ -144,12 +148,12 @@ class Environment:
                             and 0 <= new_y < self.grid_height
                             and not self.is_food_source_at(new_x, new_y)
                             and self.get_area_at(new_x, new_y) == source.area
-                            and source.area.current_food_sources < source.area.max_food_sources
+                            and self.area_food_sources[source.area] < source.area.max_food_sources
                         ):
                             cls = type(source)
                             new_source = cls(position=(new_x, new_y), area=source.area)
                             self.food_sources.append(new_source)
-                            source.area.current_food_sources += 1
+                            self.area_food_sources[source.area] += 1
 
                 self.food_sources = [fs for fs in self.food_sources if not fs.is_destroyed]
                 self.food_items.extend(new_food_items)

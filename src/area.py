@@ -6,7 +6,8 @@ class Area(Enum):
     DESERT = (3, "Desert", 1.2, 0.5, 0.0005, (200, 180, 50), 5)
     BERRY_CORNER = (4, "Berry Corner", 1.0, 1.2, 0.007, (180, 100, 255), 5)
 
-    def __init__(self, area_id, display_name, agent_speed_modifier, food_regen_modifier, expansion_chance, color, max_food_sources=5):
+    def __init__(self, area_id, display_name, agent_speed_modifier,
+                  food_regen_modifier, expansion_chance, color, max_food_sources=5):
         self.id = area_id
         self.display_name = display_name
         self.agent_speed_modifier = agent_speed_modifier
@@ -14,4 +15,3 @@ class Area(Enum):
         self.expansion_chance = expansion_chance
         self.color = color
         self.max_food_sources = max_food_sources
-        self.current_food_sources = 0
