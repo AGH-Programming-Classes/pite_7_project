@@ -36,14 +36,12 @@ class Environment:
             4: Area.BERRY_CORNER
         }
 
-        self._spawn_initial_food_sources()
-
-        self.agents = []
-        self._spawn_initial_agents()
-
         self.area_food_sources = {
             area: 0 for area in Area
         }
+        self._spawn_initial_food_sources()
+        self.agents = []
+        self._spawn_initial_agents()
 
         self.data_lock = threading.Lock()
 
@@ -105,7 +103,9 @@ class Environment:
                 for x, y in positions:
                     if x_min <= x <= x_max and y_min <= y <= y_max:
                         if not self.is_food_source_at(x, y):
-                            self.food_sources.append(cls(position=(x, y), area=area))
+                            self.food_sources.append(cls(position=(x, y),
+                                                        area=area,
+                                                        env_area_counters=self.area_food_sources))
                             self.area_food_sources[area] += 1
 
 
@@ -151,7 +151,9 @@ class Environment:
                             and self.area_food_sources[source.area] < source.area.max_food_sources
                         ):
                             cls = type(source)
-                            new_source = cls(position=(new_x, new_y), area=source.area)
+                            new_source = cls(position=(new_x, new_y),
+                                            area=source.area,
+                                            env_area_counters=self.area_food_sources)
                             self.food_sources.append(new_source)
                             self.area_food_sources[source.area] += 1
 

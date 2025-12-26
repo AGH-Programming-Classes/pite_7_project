@@ -33,9 +33,10 @@ class Food:
 class FoodSource(ABC):
     """Abstract base class for all food sources (producers)."""
 
-    def __init__(self, position: tuple, area, lifespan=1000):
+    def __init__(self, position: tuple, area, env_area_counters, lifespan=1000):
         self.x, self.y = position
         self.area = area
+        self.env_area_counters = env_area_counters
         self.food_left = 0
         self.is_destroyed = False
         self.age = 0
@@ -56,7 +57,9 @@ class FoodSource(ABC):
         """Marks the source as destroyed."""
         if not self.is_destroyed:
             self.is_destroyed = True
-            self.area.current_food_sources = max(0, self.area.current_food_sources - 1)
+            self.env_area_counters[self.area] = max(
+                0, self.env_area_counters[self.area] - 1
+            )
 
     def increment_age(self):
         """Increments age of FoodSource"""
@@ -70,8 +73,8 @@ class SimpleGrassPatch(FoodSource):
 
     FONT = None
 
-    def __init__(self, position: tuple, area):
-        super().__init__(position, area)
+    def __init__(self, position: tuple, area, env_area_counters):
+        super().__init__(position, area, env_area_counters)
         self.lifespan = 1000
         self.food_left = 100 # Initial capacity
         self.max_capacity = 100
@@ -157,8 +160,8 @@ class BerryBush(FoodSource):
 
     FONT = None
 
-    def __init__(self, position: tuple, area):
-        super().__init__(position, area)
+    def __init__(self, position: tuple, area, env_area_counters):
+        super().__init__(position, area, env_area_counters)
 
         self.food_left = 40
         self.max_capacity = 40
@@ -235,8 +238,8 @@ class FertileFruitTree(FoodSource):
     """Food for Fertile Valley"""
     FONT = None
 
-    def __init__(self, position: tuple, area):
-        super().__init__(position, area)
+    def __init__(self, position: tuple, area, env_area_counters):
+        super().__init__(position, area, env_area_counters)
         self.food_left = 50
         self.lifespan = 4000
         self.max_capacity = 50
@@ -304,8 +307,8 @@ class CactusPads(FoodSource):
     """Food source for Desert"""
     FONT = None
 
-    def __init__(self, position: tuple, area):
-        super().__init__(position, area)
+    def __init__(self, position: tuple, area, env_area_counters):
+        super().__init__(position, area, env_area_counters)
         self.food_left = 30
         self.max_capacity = 30
         self.lifespan = 5000
