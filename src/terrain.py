@@ -16,28 +16,28 @@ AREA_COVERAGE: Dict[Area, float] = {
 
 ADJACENCY_WEIGHTS: Dict[Area, Dict[Area, float]] = {
     Area.PLAINS: {
-        Area.PLAINS: 8,
-        Area.FERTILE_VALLEY: 3,
-        Area.DESERT: 2,
+        Area.PLAINS: 60,
+        Area.FERTILE_VALLEY: 2,
+        Area.DESERT: 1,
         Area.BERRY_CORNER: 1,
     },
     Area.FERTILE_VALLEY: {
-        Area.PLAINS: 4,
-        Area.FERTILE_VALLEY: 12,
+        Area.PLAINS: 2,
+        Area.FERTILE_VALLEY: 60,
         Area.DESERT: 1,
-        Area.BERRY_CORNER: 2,
+        Area.BERRY_CORNER: 1,
     },
     Area.DESERT: {
-        Area.PLAINS: 2,
+        Area.PLAINS: 1,
         Area.FERTILE_VALLEY: 1,
-        Area.DESERT: 15,
+        Area.DESERT: 300,
         Area.BERRY_CORNER: 1,
     },
     Area.BERRY_CORNER: {
-        Area.PLAINS: 2,
-        Area.FERTILE_VALLEY: 4,
+        Area.PLAINS: 1,
+        Area.FERTILE_VALLEY: 2,
         Area.DESERT: 1,
-        Area.BERRY_CORNER: 10,
+        Area.BERRY_CORNER: 200,
     },
 }
 
