@@ -3,10 +3,12 @@
 import threading
 import time
 import random
+from typing import List, Tuple
 import pygame
 from food import SimpleGrassPatch, Food, BerryBush, FertileFruitTree, CactusPads
 from agent import Agent
 from area import Area
+from terrain import generate_terrain
 
 class Environment:
     """
@@ -27,14 +29,14 @@ class Environment:
         self.pixel_width = pixel_width
         self.pixel_height = pixel_height
 
+        self.terrain = generate_terrain(
+            width=self.grid_width,
+            height=self.grid_height,
+            resolution=1,
+        )
+
         self.food_sources = []
         self.food_items = []
-        self.areas = {
-            1: Area.PLAINS,
-            2: Area.FERTILE_VALLEY,
-            3: Area.DESERT,
-            4: Area.BERRY_CORNER
-        }
 
         self.area_food_sources = {
             area: 0 for area in Area
@@ -62,51 +64,52 @@ class Environment:
         """Returns how many food sources in area"""
         return sum(1 for fs in self.food_sources if fs.area == area)
 
-    def get_area_at(self, x, y) -> Area:
+    def get_area_at(self, x: int, y: int) -> Area:
         """Returns area at location"""
-        mid_x = self.grid_width // 2
-        mid_y = self.grid_height // 2
+        if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
+            return self.terrain[y][x]
+        return Area.PLAINS
 
-        if x < mid_x and y < mid_y:
-            return self.areas[1]  # top-left
-        if x >= mid_x and y < mid_y:
-            return self.areas[2]  # top-right
-        if x < mid_x and y >= mid_y:
-            return self.areas[3]  # bottom-left
-        return self.areas[4]  # bottom-right
+    def _cells_for_area(self, area: Area) -> List[Tuple[int, int]]:
+        """Returns list of (x, y) coordinates that belong to the given area."""
+        return [
+            (x, y)
+            for y in range(self.grid_height)
+            for x in range(self.grid_width)
+            if self.terrain[y][x] == area
+        ]
 
 
     def _spawn_initial_food_sources(self):
-        mid_x = self.grid_width // 2
-        mid_y = self.grid_height // 2
-
-        corners = {
-            1: (0, 0, mid_x - 1, mid_y - 1),
-            2: (mid_x, 0, self.grid_width - 1, mid_y - 1),
-            3: (0, mid_y, mid_x - 1, self.grid_height - 1),
-            4: (mid_x, mid_y, self.grid_width - 1, self.grid_height - 1)
+        spawn_plan = {
+            Area.PLAINS: (SimpleGrassPatch, 4),
+            Area.FERTILE_VALLEY: (FertileFruitTree, 3),
+            Area.DESERT: (CactusPads, 3),
+            Area.BERRY_CORNER: (BerryBush, 3),
         }
 
-        initial_sources = [
-            (SimpleGrassPatch, 1, [(2, 2), (4, 4)]),
-            (FertileFruitTree, 2, [(mid_x + 1, 1), (mid_x + 3, 3)]),
-            (CactusPads, 3, [(2, mid_y + 1), (4, mid_y + 3)]),
-            (BerryBush, 4, [(mid_x + 1, mid_y + 1), (mid_x + 3, mid_y + 3)])
-        ]
+        for area, (cls, desired_count) in spawn_plan.items():
+            available_cells = self._cells_for_area(area)
+            if not available_cells:
+                continue
 
-        for cls, area_id, positions in initial_sources:
-            area = self.areas[area_id]
-            x_min, y_min, x_max, y_max = corners[area_id]
-
-            existing_in_area = [fs for fs in self.food_sources if fs.area == area]
-            if not existing_in_area:
-                for x, y in positions:
-                    if x_min <= x <= x_max and y_min <= y <= y_max:
-                        if not self.is_food_source_at(x, y):
-                            self.food_sources.append(cls(position=(x, y),
-                                                        area=area,
-                                                        env_area_counters=self.area_food_sources))
-                            self.area_food_sources[area] += 1
+            random.shuffle(available_cells)
+            allowed = min(
+                desired_count,
+                len(available_cells),
+                area.max_food_sources - self.area_food_sources[area]
+            )
+            for x, y in available_cells[:allowed]:
+                if self.is_food_source_at(x, y):
+                    continue
+                self.food_sources.append(
+                    cls(
+                        position=(x, y),
+                        area=area,
+                        env_area_counters=self.area_food_sources
+                    )
+                )
+                self.area_food_sources[area] += 1
 
 
 
