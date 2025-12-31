@@ -32,7 +32,6 @@ class Environment:
         self.terrain = generate_terrain(
             width=self.grid_width,
             height=self.grid_height,
-            resolution=1,
         )
 
         self.food_sources = []

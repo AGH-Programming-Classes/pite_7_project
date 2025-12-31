@@ -45,38 +45,33 @@ ADJACENCY_WEIGHTS: Dict[Area, Dict[Area, float]] = {
 def generate_terrain(
     width: int,
     height: int,
-    resolution: int,
     seed: Optional[int] = None,
     bias_min: float = 0.25,
     bias_max: float = 8.0,
 ) -> List[List[Area]]:
     """Single-function WFC-ish generator returning an Area grid."""
-    assert width % resolution == 0 and height % resolution == 0
-    grid_w = width // resolution
-    grid_h = height // resolution
-
     rng = random.Random(seed)
 
     wave: List[List[Set[Area]]] = [
-        [set(Area) for _ in range(grid_w)]
-        for _ in range(grid_h)
+        [set(Area) for _ in range(width)]
+        for _ in range(height)
     ]
     bias_grid: List[List[Dict[Area, float]]] = [
         [
             {area: 1.0 for area in Area}
-            for _ in range(grid_w)
+            for _ in range(width)
         ]
-        for _ in range(grid_h)
+        for _ in range(height)
     ]
     entropy_map: Dict[Tuple[int, int], float] = {}
     entropy_heap: List[Tuple[float, float, int, int]] = []
     unresolved = {
         (x, y)
-        for y in range(grid_h)
-        for x in range(grid_w)
+        for y in range(height)
+        for x in range(width)
     }
     terrain: List[List[Area]] = [
-        [Area.PLAINS for _ in range(grid_w)] for _ in range(grid_h)
+        [Area.PLAINS for _ in range(width)] for _ in range(height)
     ]
 
     def calculate_entropy(options: Sequence[Area], x: int, y: int) -> float:
@@ -110,15 +105,15 @@ def generate_terrain(
     def neighbours(x: int, y: int) -> Iterable[Tuple[int, int]]:
         if x > 0:
             yield (x - 1, y)
-        if x + 1 < grid_w:
+        if x + 1 < width:
             yield (x + 1, y)
         if y > 0:
             yield (x, y - 1)
-        if y + 1 < grid_h:
+        if y + 1 < height:
             yield (x, y + 1)
 
-    for y in range(grid_h):
-        for x in range(grid_w):
+    for y in range(height):
+        for x in range(width):
             push_entropy(x, y)
 
     while unresolved:
