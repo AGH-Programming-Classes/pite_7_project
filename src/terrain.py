@@ -63,9 +63,7 @@ def generate_terrain(
         ]
         for _ in range(height)
     ]
-    entropy_map: Dict[Tuple[int, int], float] = {}
-    entropy_heap: List[Tuple[float, float, int, int]] = []
-    unresolved = {
+    entropy_map, entropy_heap, unresolved = {}, [], {
         (x, y)
         for y in range(height)
         for x in range(width)
