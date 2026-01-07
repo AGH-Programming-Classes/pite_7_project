@@ -1,3 +1,21 @@
+        # Sense vector (normalized inputs for neural network):
+        # 0  hp_n            -> current HP / max HP (0..1)
+        # 1  en_n            -> current energy / max energy (0..1)
+        # 2  age_n           -> current age / max age (0..1)
+        # 3  x_n             -> x position normalized to world width (0..1)
+        # 4  y_n             -> y position normalized to world height (0..1)
+        # 5  head_x          -> facing direction x (cos(angle))
+        # 6  head_y          -> facing direction y (-sin(angle))
+        # 7  food_d_n        -> distance to nearest food normalized by sight (0..1)
+        # 8  food_dx_n       -> x direction to nearest food (normalized)
+        # 9  food_dy_n       -> y direction to nearest food (normalized)
+        # 10 friend_count_n  -> nearby friends count (normalized)
+        # 11 enemy_count_n   -> nearby enemies count (normalized)
+        # 12 enemy_d_n       -> distance to nearest enemy normalized by sight (0..1)
+        # 13 enemy_dx_n      -> x direction to nearest enemy (normalized)
+        # 14 enemy_dy_n      -> y direction to nearest enemy (normalized)
+        # 15 bias            -> constant bias input (always 1.0)
+
 import math
 import random
 import pygame
@@ -39,8 +57,7 @@ class Agent:
         self.x = float(position[0])
         self.y = float(position[1])
 
-        self.angle = random.random() * 360.0
-        self.last_action = self.ACTION_MOVE
+        self.group_id = random.randint(0, 1)  # team/species id (same -> friend, different -> enemy)
 
         self.body_points_total = 100
         self.body_points = self._random_body_points(self.body_points_total)
@@ -50,13 +67,15 @@ class Agent:
         self.base_speed = 0.05 + _sqrt_scale(self.body_points["speed"], 0.02)
         self.attack_power = 0.5 + _sqrt_scale(self.body_points["attack"], 0.06)
         self.max_age = int(200 + _sqrt_scale(self.body_points["lifespan"], 14.0))
-        self.sight = 2.0 + _sqrt_scale(self.body_points["sight"], 0.35)
+        self.sight = 70.0 + _sqrt_scale(self.body_points["sight"], 6.0)
+        self.agility = 30.0 + _sqrt_scale(self.body_points["agility"], 2.0)
 
         self.hp = self.max_hp
         self.energy = self.max_energy
         self.age = 0
 
-        self.agility = 30.0 + _sqrt_scale(self.body_points["agility"], 2.0)
+        self.angle = random.random() * 360.0
+        self.last_action = self.ACTION_MOVE
 
         self.input_size = 16
         self.action_count = 5
@@ -65,7 +84,8 @@ class Agent:
         self.W = self._random_matrix(self.input_size, self.output_size, scale=0.6)
 
         self._inputs_override = None
-        self._last_target = None
+        self._last_enemy = None
+        self._last_food = None
 
     def _random_body_points(self, total: int):
         keys = ["hp", "energy", "speed", "attack", "lifespan", "sight", "agility"]
@@ -83,7 +103,7 @@ class Agent:
             return
         if len(inputs) != self.input_size:
             raise ValueError(f"expected input vector length {self.input_size}, got {len(inputs)}")
-        self._inputs_override = [float(x) for x in inputs]
+        self._inputs_override = [float(v) for v in inputs]
 
     def sense(self, foods=None, agents=None):
         bx = float(self.bound_x) if self.bound_x > 0 else 1.0
@@ -93,17 +113,17 @@ class Agent:
         en_n = _clamp(self.energy / max(1e-9, self.max_energy), 0.0, 1.0)
         age_n = _clamp(self.age / max(1, self.max_age), 0.0, 1.0)
 
-        x_n = _clamp(self.x / max(1e-9, bx), 0.0, 1.0)
+        x_n = _clamp(self.x / max(1e-9, bx), 0.0, 1.0)  # normalized position
         y_n = _clamp(self.y / max(1e-9, by), 0.0, 1.0)
 
         ang = math.radians(self.angle)
-        head_x = math.cos(ang)
+        head_x = math.cos(ang)  # facing direction (unit vector)
         head_y = -math.sin(ang)
 
         food_d_n, food_dx_n, food_dy_n = 1.0, 0.0, 0.0
         if foods:
-            best = None
             best_d2 = 1e18
+            best = None
             for f in foods:
                 fx = float(getattr(f, "x", 0.0))
                 fy = float(getattr(f, "y", 0.0))
@@ -118,41 +138,51 @@ class Agent:
                 food_d_n = _clamp(d / max(1e-9, self.sight), 0.0, 1.0)
                 food_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
                 food_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
-                self._last_target = best
+                self._last_food = best
 
         friend_count_n = 0.0
         enemy_count_n = 0.0
-        enemy_d_n = 1.0
-        enemy_dx_n = 0.0
-        enemy_dy_n = 0.0
+        enemy_d_n, enemy_dx_n, enemy_dy_n = 1.0, 0.0, 0.0
 
         if agents:
             r2 = self.sight * self.sight
             friends = 0
             enemies = 0
-            best_e = None
-            best_e_d2 = 1e18
+            best_enemy_d2 = 1e18
+            best_enemy = None
+
             for a in agents:
                 if a is self:
                     continue
                 ax = float(getattr(a, "x", 0.0))
                 ay = float(getattr(a, "y", 0.0))
                 d2 = _dist2(self.x, self.y, ax, ay)
-                if d2 <= r2:
+                if d2 > r2:
+                    continue
+
+                same_group = getattr(a, "group_id", None) == self.group_id
+                if same_group:
                     friends += 1
-                if d2 < best_e_d2:
-                    best_e_d2 = d2
-                    best_e = (ax, ay)
+                else:
                     enemies += 1
+                    if d2 < best_enemy_d2:
+                        best_enemy_d2 = d2
+                        best_enemy = (ax, ay)
+
             friend_count_n = _clamp(friends / 10.0, 0.0, 1.0)
             enemy_count_n = _clamp(enemies / 10.0, 0.0, 1.0)
-            if best_e is not None:
-                dx = best_e[0] - self.x
-                dy = best_e[1] - self.y
-                d = math.sqrt(best_e_d2)
+
+            if best_enemy is not None:
+                dx = best_enemy[0] - self.x
+                dy = best_enemy[1] - self.y
+                d = math.sqrt(best_enemy_d2)
                 enemy_d_n = _clamp(d / max(1e-9, self.sight), 0.0, 1.0)
                 enemy_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
                 enemy_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
+                self._last_enemy = best_enemy
+            else:
+                self._last_enemy = None
+
 
         return [
             hp_n,
@@ -237,12 +267,12 @@ class Agent:
         self.energy = min(self.max_energy, self.energy + 0.03)
 
     def _flee(self, turn: float, intensity: float):
-        if self._last_target is None:
+        if self._last_enemy is None:
             self._move(turn, intensity)
             return
-        tx, ty = self._last_target
-        dx = self.x - float(tx)
-        dy = self.y - float(ty)
+        ex, ey = self._last_enemy
+        dx = self.x - float(ex)
+        dy = self.y - float(ey)
         ang = math.degrees(math.atan2(-dy, dx))
         self.angle = ang % 360.0
         self._move(0.0, max(0.2, intensity))
@@ -275,7 +305,6 @@ class Agent:
 
         outputs = self.think(inputs)
         action, turn, intensity = self.decide(outputs)
-
         self.last_action = action
 
         if action == self.ACTION_MOVE:
@@ -294,9 +323,8 @@ class Agent:
     def render(self, window: pygame.window, cell_size: int, offset: tuple):
         offset_x, offset_y = offset
 
-        env_x = offset_x + self.x * cell_size
-        env_y = offset_y + self.y * cell_size
-
+        env_x = offset_x + self.x
+        env_y = offset_y + self.y
         r = max(2.0, cell_size * 0.25)
 
         points = []
