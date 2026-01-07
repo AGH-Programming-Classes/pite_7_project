@@ -23,4 +23,4 @@ jobs:
       - name: Run Pylint
         # C0116,R0914,R0902 are issues we decided we do not care about
         # W291,W292,W293,W391,E301,E302 should get fixed by the autoformat job
-        run: pylint src/ --disable=C0116,R0914,R0902,W291,W292,W293,W391,E301,E302
+        run: pylint src/ --disable=C0116,R0914,R0902,C0114,C0115

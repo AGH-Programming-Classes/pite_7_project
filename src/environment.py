@@ -3,10 +3,12 @@
 import threading
 import time
 import random
+from typing import List, Tuple
 import pygame
-from food import SimpleGrassPatch
+from food import SimpleGrassPatch, Food, BerryBush, FertileFruitTree, CactusPads
 from agent import Agent
-
+from area import Area
+from terrain import generate_terrain
 
 class Environment:
     """
@@ -27,10 +29,18 @@ class Environment:
         self.pixel_width = pixel_width
         self.pixel_height = pixel_height
 
+        self.terrain = generate_terrain(
+            width=self.grid_width,
+            height=self.grid_height,
+        )
+
         self.food_sources = []
         self.food_items = []
-        self._spawn_initial_food_sources()
 
+        self.area_food_sources = {
+            area: 0 for area in Area
+        }
+        self._spawn_initial_food_sources()
         self.agents = []
         self._spawn_initial_agents()
 
@@ -45,25 +55,62 @@ class Environment:
             [0 for _ in range(self.grid_width)] for _ in range(self.grid_height)
         ]
 
-    def _spawn_initial_food_sources(self):
-        mid_x = self.grid_width // 2 + 1
-        mid_y = self.grid_height // 2 + 1
+    def is_food_source_at(self, x: int, y: int) -> bool:
+        """Returns if food_source at location"""
+        return any(fs.x == x and fs.y == y and not fs.is_destroyed for fs in self.food_sources)
 
-        spawn_locations = [
-            (mid_x, mid_y),
-            (mid_x - 2, mid_y - 2),
-            (mid_x + 2, mid_y + 2),
-            (mid_x - 2, mid_y + 2),
-            (mid_x + 2, mid_y - 2)
+    def count_food_sources_in_area(self, area: Area) -> int:
+        """Returns how many food sources in area"""
+        return sum(1 for fs in self.food_sources if fs.area == area)
+
+    def get_area_at(self, x: int, y: int) -> Area:
+        """Returns area at location"""
+        if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
+            return self.terrain[y][x]
+        return Area.PLAINS
+
+    def _cells_for_area(self, area: Area) -> List[Tuple[int, int]]:
+        """Returns list of (x, y) coordinates that belong to the given area."""
+        return [
+            (x, y)
+            for y in range(self.grid_height)
+            for x in range(self.grid_width)
+            if self.terrain[y][x] == area
         ]
 
-        for x, y in spawn_locations:
-            if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
-                grass_patch = SimpleGrassPatch(
-                    position=(x, y),
-                    area_id=1  # Default Area ID
+
+    def _spawn_initial_food_sources(self):
+        spawn_plan = {
+            Area.PLAINS: (SimpleGrassPatch, 4),
+            Area.FERTILE_VALLEY: (FertileFruitTree, 3),
+            Area.DESERT: (CactusPads, 3),
+            Area.BERRY_CORNER: (BerryBush, 3),
+        }
+
+        for area, (cls, desired_count) in spawn_plan.items():
+            available_cells = self._cells_for_area(area)
+            if not available_cells:
+                continue
+
+            random.shuffle(available_cells)
+            allowed = min(
+                desired_count,
+                len(available_cells),
+                area.max_food_sources - self.area_food_sources[area]
+            )
+            for x, y in available_cells[:allowed]:
+                if self.is_food_source_at(x, y):
+                    continue
+                self.food_sources.append(
+                    cls(
+                        position=(x, y),
+                        area=area,
+                        env_area_counters=self.area_food_sources
+                    )
                 )
-                self.food_sources.append(grass_patch)
+                self.area_food_sources[area] += 1
+
+
 
     def _spawn_initial_agents(self):
         Agent.bound_x = self.pixel_width
@@ -82,10 +129,37 @@ class Environment:
 
                 new_food_items = []
                 for source in self.food_sources:
-                    dropped_food = source.update()
-                    if dropped_food:
-                        new_food_items.append(dropped_food)
+                    result = source.update()
 
+                    if source.is_destroyed:
+                        self.food_items = [f for f in self.food_items if
+                        (f.x, f.y) != (source.x, source.y)]
+                        continue
+
+                    if isinstance(result, Food):
+                        new_food_items.append(result)
+
+                    if random.random() < getattr(source.area, 'expansion_chance', 0):
+                        dx = random.randint(-3, 3)
+                        dy = random.randint(-3, 3)
+                        new_x = source.x + dx
+                        new_y = source.y + dy
+
+                        if (
+                            0 <= new_x < self.grid_width
+                            and 0 <= new_y < self.grid_height
+                            and not self.is_food_source_at(new_x, new_y)
+                            and self.get_area_at(new_x, new_y) == source.area
+                            and self.area_food_sources[source.area] < source.area.max_food_sources
+                        ):
+                            cls = type(source)
+                            new_source = cls(position=(new_x, new_y),
+                                            area=source.area,
+                                            env_area_counters=self.area_food_sources)
+                            self.food_sources.append(new_source)
+                            self.area_food_sources[source.area] += 1
+
+                self.food_sources = [fs for fs in self.food_sources if not fs.is_destroyed]
                 self.food_items.extend(new_food_items)
 
                 food_to_keep = []
@@ -118,18 +192,16 @@ class Environment:
                         cell_size
                     )
 
-                    if (x + y) % 2 == 0:
-                        cell_color = (50, 50, 50)
-                    else:
-                        cell_color = (40, 40, 40)
+                    area = self.get_area_at(x,y)
+                    cell_color = area.color
 
                     pygame.draw.rect(window, cell_color, cell_rect)
-                    pygame.draw.rect(window, (70, 70, 70), cell_rect, 1)
+                    pygame.draw.rect(window, (40, 40, 40), cell_rect, 1)
 
             for source in self.food_sources:
-                source.render(window, cell_size)
+                source.render(window, cell_size, self.food_items, (panel_x, panel_y))
             for food in self.food_items:
-                food.render(window, cell_size)
+                food.render(window, cell_size, panel_x, panel_y)
 
             for agent in self.agents:
                 agent.render(window, cell_size, (panel_x, panel_y))
