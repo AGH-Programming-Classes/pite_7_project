@@ -77,7 +77,7 @@ class Agent:
         self.angle = random.random() * 360.0
         self.last_action = self.ACTION_MOVE
 
-        self.input_size = 16
+        self.input_size = len(self.sense())
         self.action_count = 5
         self.output_size = self.action_count + 2
 
@@ -121,7 +121,7 @@ class Agent:
         head_x = math.cos(ang)  # facing direction (unit vector)
         head_y = -math.sin(ang)
 
-        food_d_n, food_dx_n, food_dy_n = 1.0, 0.0, 0.0
+        food_d_n, food_dx_n, food_dy_n, food_in_sigth = 1.0, 0.0, 0.0, 0
         if foods:
             best_d2 = 1e18
             best = None
@@ -140,8 +140,11 @@ class Agent:
                 food_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
                 food_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
                 self._last_food = best
+                if d <= self.sight: # Adding boolean to deal with semantic discontinuity ( 1 could mean food is far away and 0,95 mean is really close)
+                    food_in_sigth = 1
 
         friend_count_n = 0.0
+        friend_d_n, friend_dx_n, friend_dy_n = 1.0, 0.0, 0.0
         enemy_count_n = 0.0
         enemy_d_n, enemy_dx_n, enemy_dy_n = 1.0, 0.0, 0.0
 
@@ -149,6 +152,8 @@ class Agent:
             r2 = self.sight * self.sight
             friends = 0
             enemies = 0
+            best_friend_d2 = 1e18
+            best_friend = None 
             best_enemy_d2 = 1e18
             best_enemy = None
 
@@ -164,6 +169,9 @@ class Agent:
                 same_group = getattr(a, "group_id", None) == self.group_id
                 if same_group:
                     friends += 1
+                    if d2 < best_friend_d2:
+                        best_friend_d2 = d2
+                        best_friend = (ax, ay)
                 else:
                     enemies += 1
                     if d2 < best_enemy_d2:
@@ -184,6 +192,20 @@ class Agent:
             else:
                 self._last_enemy = None
 
+            
+            if best_friend is not None: # Adding this part to enable to agent getting information where are friends
+                dx = best_friend[0] - self.x
+                dy = best_friend[1] - self.y
+                d = math.sqrt(best_friend_d2)
+                friend_d_n = _clamp(d / max(1e-9, self.sight), 0.0, 1.0)
+                friend_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
+                friend_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
+                self._last_friend = best_friend
+            else:
+                self._last_friend = None
+
+            
+
 
         return [
             hp_n,
@@ -196,7 +218,11 @@ class Agent:
             food_d_n,
             food_dx_n,
             food_dy_n,
+            food_in_sigth,
             friend_count_n,
+            friend_d_n,
+            friend_dx_n,
+            friend_dy_n,
             enemy_count_n,
             enemy_d_n,
             enemy_dx_n,
@@ -265,7 +291,7 @@ class Agent:
         self.energy = max(0.0, self.energy - cost)
 
     def _idle(self):
-        self.energy = min(self.max_energy, self.energy + 0.03)
+        self.energy = min(self.max_energy, self.energy - 0.01)
 
     def _flee(self, turn: float, intensity: float):
         if self._last_enemy is None:
