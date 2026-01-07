@@ -81,7 +81,8 @@ class Agent:
         self.action_count = 5
         self.output_size = self.action_count + 2
 
-        self.W = self._random_matrix(self.input_size, self.output_size, scale=0.6)
+        self.weights = self._random_matrix(self.input_size, self.output_size, scale=0.6)
+
 
         self._inputs_override = None
         self._last_enemy = None
@@ -207,7 +208,7 @@ class Agent:
         out = [0.0 for _ in range(self.output_size)]
         for i in range(self.input_size):
             xi = inputs[i]
-            wi = self.W[i]
+            wi = self.weights[i]
             for j in range(self.output_size):
                 out[j] += xi * wi[j]
         for j in range(self.output_size):
