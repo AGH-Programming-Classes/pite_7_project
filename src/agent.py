@@ -19,7 +19,9 @@
 import math
 import random
 import pygame
-
+import typing
+from environment import Environment
+from __future__ import annotations
 
 def _clamp(x: float, lo: float, hi: float) -> float:
     if x < lo:
@@ -47,20 +49,30 @@ class Agent:
     bound_x = 0
     bound_y = 0
 
-    ACTION_MOVE = 0
-    ACTION_IDLE = 1
-    ACTION_FLEE = 2
-    ACTION_MATE = 3
-    ACTION_ATTACK = 4
+    actions = {"ACTION_MOVE" : 0,
+    "ACTION_IDLE" : 1,
+    "ACTION_FLEE" : 2,
+    "ACTION_MATE" : 3,
+    "ACTION_ATTACK" : 4}
 
-    def __init__(self, position: tuple):
+    body_points_total = 100
+
+    #parameters to reproduction
+    chance_for_mutation = 0.05
+    mutation_multiply_border = 0.2 # random.uniform(1-var,1+var)
+    mutation_addding_border = 0.05
+
+    def __init__(self, position: tuple, environment : Environment,/, decision_matrix : typing.List[typing.List[int]] = None, genome = None ):
+        self.environment = environment
         self.x = float(position[0])
         self.y = float(position[1])
 
         self.group_id = random.randint(0, 1)  # team/species id (same -> friend, different -> enemy)
 
-        self.body_points_total = 100
-        self.body_points = self._random_body_points(self.body_points_total)
+        if genome:
+            self.body_points = genome
+        else:
+            self.body_points = self._random_body_points(self.body_points_total)
 
         self.max_hp = 10.0 + _sqrt_scale(self.body_points["hp"], 2.0)
         self.max_energy = 10.0 + _sqrt_scale(self.body_points["energy"], 2.0)
@@ -75,13 +87,16 @@ class Agent:
         self.age = 0
 
         self.angle = random.random() * 360.0
-        self.last_action = self.ACTION_MOVE
+        self.last_action = self.actions["ACTION_MOVE"]
 
         self.input_size = len(self.sense())
-        self.action_count = 5
+        self.action_count = len(self.actions)
         self.output_size = self.action_count + 2
 
-        self.weights = self._random_matrix(self.input_size, self.output_size, scale=0.6)
+        if decision_matrix:
+            self.weights = decision_matrix
+        else:
+            self.weights = self._random_matrix(self.input_size, self.output_size, scale=0.6)
 
 
         self._inputs_override = None
@@ -308,7 +323,15 @@ class Agent:
         self.energy = max(0.0, self.energy - 0.08)
 
     def _mate(self):
-        self.energy = max(0.0, self.energy - 0.05)
+        self.energy = max(0.0, self.energy - 0.3)
+        agents : typing.List[Agent] = self.environment.get_agents()
+        close_agents : typing.List[Agent] = []
+        for ag in agents:
+            if _dist2(ag.x, ag.y, self.x, self.y) < 5:
+                close_agents.append(ag)
+        matrix, vector = self.create_new_genes(self, random.choice(close_agents))
+        self.environment.create_agent(Agent((self.x, self.y), self.environment, decision_matrix = matrix, genome = vector))
+
 
     def _tick_body(self):
         self.age += 1
@@ -334,18 +357,59 @@ class Agent:
         action, turn, intensity = self.decide(outputs)
         self.last_action = action
 
-        if action == self.ACTION_MOVE:
+        if action == self.actions["ACTION_MOVE"]:
             self._move(turn, intensity)
-        elif action == self.ACTION_IDLE:
+        elif action == self.actions["ACTION_IDLE"]:
             self._idle()
-        elif action == self.ACTION_FLEE:
+        elif action == self.actions["ACTION_FLEE"]:
             self._flee(turn, intensity)
-        elif action == self.ACTION_MATE:
+        elif action == self.actions["ACTION_MATE"]:
             self._mate()
         else:
             self._attack()
 
         self._tick_body()
+
+    def create_new_genes(self, second : Agent):
+        matrix =  self.create_new_decision_matrix(second)
+        vector = self.create_new_genome_vector(second)
+
+        numbers_to_change_in_matrix = int(len(matrix) * len(matrix[0]) / (1 / self.chance_for_mutation))
+
+        #Applying mutation - there could be multiply of value or adding
+
+        for _ in range(numbers_to_change_in_matrix):
+            row = random.choice(matrix)
+            i = random.randint(0, len(row)-1)
+            if random.random() < 0.2:
+                row[i] *= random.uniform(sel, 1.2)
+            else:
+                row[i] += random.uniform(-0.05, 0.05)
+
+        for _ in range(int(len(vector) / (1 / self.chance_for_mutation))):
+            i = random.randint(0, len(vector)-1)
+            if random.random() < 0.2:
+                vector[i] *= random.uniform(1 - self.mutation_multiply_border, 1 + self.mutation_multiply_border)
+            else:
+                vector[i] += random.uniform(-self.mutation_addding_border, self.mutation_addding_border)
+
+        #Normalisation of vector
+
+        val = 100 / sum(vector)
+        vector = map(lambda el : el * val, vector)
+
+        return matrix, vector
+        
+    def create_new_decision_matrix(self, second : Agent):
+        output = []
+        for i in range(len(self.weights)):
+            number = random.randint(0, len(self.weights[0]))
+            output.append(self.weights[i][:number] + self.weights[i][number:])
+        return output
+
+    def create_new_genome_vector(self, second : Agent):
+        number = random.randint(0, len(self.body_points))
+        return self.body_points[:number] + self.body_points[number:]
 
     def render(self, window: pygame.window, cell_size: int, offset: tuple):
         offset_x, offset_y = offset

@@ -219,3 +219,10 @@ class Environment:
         self.running = False
         if self.simulation_thread.is_alive():
             self.simulation_thread.join(timeout=1.0)
+
+    def get_agents(self):
+        return self.agents
+    
+    #This function should deal with creating new agents
+    def create_agent(self, agent : Agent):
+        pass
