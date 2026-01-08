@@ -119,7 +119,7 @@ class Environment:
         for _ in range(5):
             pos_x = random.randint(0, Agent.bound_x)
             pos_y = random.randint(0, Agent.bound_y)
-            agent = Agent((pos_x, pos_y))
+            agent = Agent((pos_x, pos_y), self)
             self.agents.append(agent)
 
     def _simulation_loop(self):

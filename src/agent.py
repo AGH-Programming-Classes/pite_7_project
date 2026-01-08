@@ -15,13 +15,13 @@
         # 13 enemy_dx_n      -> x direction to nearest enemy (normalized)
         # 14 enemy_dy_n      -> y direction to nearest enemy (normalized)
         # 15 bias            -> constant bias input (always 1.0)
-
+from __future__ import annotations
 import math
 import random
 import pygame
 import typing
-from environment import Environment
-from __future__ import annotations
+if typing.TYPE_CHECKING:
+    from environment import Environment
 
 def _clamp(x: float, lo: float, hi: float) -> float:
     if x < lo:
@@ -57,6 +57,7 @@ class Agent:
 
     body_points_total = 100
 
+    distance_to_partner_to_mate = 3
     #parameters to reproduction
     chance_for_mutation = 0.05
     mutation_multiply_border = 0.2 # random.uniform(1-var,1+var)
@@ -102,6 +103,7 @@ class Agent:
         self._inputs_override = None
         self._last_enemy = None
         self._last_food = None
+
 
     def _random_body_points(self, total: int):
         keys = ["hp", "energy", "speed", "attack", "lifespan", "sight", "agility"]
@@ -323,14 +325,16 @@ class Agent:
         self.energy = max(0.0, self.energy - 0.08)
 
     def _mate(self):
+        from environment import Environment
         self.energy = max(0.0, self.energy - 0.3)
         agents : typing.List[Agent] = self.environment.get_agents()
         close_agents : typing.List[Agent] = []
         for ag in agents:
-            if _dist2(ag.x, ag.y, self.x, self.y) < 5:
+            if _dist2(ag.x, ag.y, self.x, self.y) < self.distance_to_partner_to_mate:
                 close_agents.append(ag)
-        matrix, vector = self.create_new_genes(self, random.choice(close_agents))
-        self.environment.create_agent(Agent((self.x, self.y), self.environment, decision_matrix = matrix, genome = vector))
+        if len(close_agents) > 0:
+            matrix, vector = self.create_new_genes( random.choice(close_agents))
+            self.environment.create_agent(Agent((self.x, self.y), self.environment, decision_matrix = matrix, genome = vector))
 
 
     def _tick_body(self):
@@ -382,20 +386,20 @@ class Agent:
             row = random.choice(matrix)
             i = random.randint(0, len(row)-1)
             if random.random() < 0.2:
-                row[i] *= random.uniform(sel, 1.2)
+                row[i] *= random.uniform(1 - self.mutation_multiply_border, 1 + self.mutation_multiply_border)
             else:
-                row[i] += random.uniform(-0.05, 0.05)
+                row[i] += random.uniform(-self.mutation_addding_border, self.mutation_addding_border)
 
         for _ in range(int(len(vector) / (1 / self.chance_for_mutation))):
-            i = random.randint(0, len(vector)-1)
+            item = random.choice(vector.keys())
             if random.random() < 0.2:
-                vector[i] *= random.uniform(1 - self.mutation_multiply_border, 1 + self.mutation_multiply_border)
+                vector[item] *= random.uniform(1 - self.mutation_multiply_border, 1 + self.mutation_multiply_border)
             else:
-                vector[i] += random.uniform(-self.mutation_addding_border, self.mutation_addding_border)
+                vector[item] += random.uniform(-self.mutation_addding_border, self.mutation_addding_border)
 
         #Normalisation of vector
 
-        val = 100 / sum(vector)
+        val = 100 / sum(vector.values())
         vector = map(lambda el : el * val, vector)
 
         return matrix, vector
@@ -408,8 +412,10 @@ class Agent:
         return output
 
     def create_new_genome_vector(self, second : Agent):
-        number = random.randint(0, len(self.body_points))
-        return self.body_points[:number] + self.body_points[number:]
+        genome = self.body_points.copy()
+        for item in genome.keys():
+            genome[item] = self.body_points[item] if random.randint(0,1) == 1 else second.body_points[item]
+        return genome
 
     def render(self, window: pygame.window, cell_size: int, offset: tuple):
         offset_x, offset_y = offset
