@@ -1,20 +1,4 @@
-        # Sense vector (normalized inputs for neural network):
-        # 0  hp_n            -> current HP / max HP (0..1)
-        # 1  en_n            -> current energy / max energy (0..1)
-        # 2  age_n           -> current age / max age (0..1)
-        # 3  x_n             -> x position normalized to world width (0..1)
-        # 4  y_n             -> y position normalized to world height (0..1)
-        # 5  head_x          -> facing direction x (cos(angle))
-        # 6  head_y          -> facing direction y (-sin(angle))
-        # 7  food_d_n        -> distance to nearest food normalized by sight (0..1)
-        # 8  food_dx_n       -> x direction to nearest food (normalized)
-        # 9  food_dy_n       -> y direction to nearest food (normalized)
-        # 10 friend_count_n  -> nearby friends count (normalized)
-        # 11 enemy_count_n   -> nearby enemies count (normalized)
-        # 12 enemy_d_n       -> distance to nearest enemy normalized by sight (0..1)
-        # 13 enemy_dx_n      -> x direction to nearest enemy (normalized)
-        # 14 enemy_dy_n      -> y direction to nearest enemy (normalized)
-        # 15 bias            -> constant bias input (always 1.0)
+"""Agent module containing the Agent class and related utilities for simulation."""
 
 import math
 import random
@@ -22,6 +6,7 @@ import pygame
 
 
 def _clamp(x: float, lo: float, hi: float) -> float:
+    """Clamps value x between lo and hi."""
     if x < lo:
         return lo
     if x > hi:
@@ -30,20 +15,42 @@ def _clamp(x: float, lo: float, hi: float) -> float:
 
 
 def _tanh(x: float) -> float:
+    """Hyperbolic tangent activation function."""
     return math.tanh(x)
 
 
 def _sqrt_scale(points: float, k: float) -> float:
+    """Scales points using square root with coefficient k."""
     return k * math.sqrt(max(0.0, points))
 
 
 def _dist2(ax: float, ay: float, bx: float, by: float) -> float:
+    """Returns squared Euclidean distance between (ax, ay) and (bx, by)."""
     dx = ax - bx
     dy = ay - by
     return dx * dx + dy * dy
 
 
 class Agent:
+    """Represents an agent in the simulation with neural network-based decision making."""
+
+    # Sense vector (normalized inputs for neural network):
+    # 0  hp_n            -> current HP / max HP (0..1)
+    # 1  en_n            -> current energy / max energy (0..1)
+    # 2  age_n           -> current age / max age (0..1)
+    # 3  x_n             -> x position normalized to world width (0..1)
+    # 4  y_n             -> y position normalized to world height (0..1)
+    # 5  head_x          -> facing direction x (cos(angle))
+    # 6  head_y          -> facing direction y (-sin(angle))
+    # 7  food_d_n        -> distance to nearest food normalized by sight (0..1)
+    # 8  food_dx_n       -> x direction to nearest food (normalized)
+    # 9  food_dy_n       -> y direction to nearest food (normalized)
+    # 10 friend_count_n  -> nearby friends count (normalized)
+    # 11 enemy_count_n   -> nearby enemies count (normalized)
+    # 12 enemy_d_n       -> distance to nearest enemy normalized by sight (0..1)
+    # 13 enemy_dx_n      -> x direction to nearest enemy (normalized)
+    # 14 enemy_dy_n      -> y direction to nearest enemy (normalized)
+    # 15 bias            -> constant bias input (always 1.0)
     bound_x = 0
     bound_y = 0
     cell_size = 1
@@ -55,10 +62,12 @@ class Agent:
     ACTION_ATTACK = 4
 
     def __init__(self, position: tuple):
+        """Initialize agent at position with random stats and neural weights."""
         self.x = float(position[0])
         self.y = float(position[1])
 
-        self.group_id = random.randint(0, 1)  # team/species id (same -> friend, different -> enemy)
+        # team/species id (same -> friend, different -> enemy)
+        self.group_id = random.randint(0, 1)
 
         self.body_points_total = 100
         self.body_points = self._random_body_points(self.body_points_total)
@@ -90,6 +99,7 @@ class Agent:
         self._last_food = None
 
     def _random_body_points(self, total: int):
+        """Randomly distribute total points across body stat keys."""
         keys = ["hp", "energy", "speed", "attack", "lifespan", "sight", "agility"]
         pts = {k: 0 for k in keys}
         for _ in range(total):
@@ -97,9 +107,11 @@ class Agent:
         return pts
 
     def _random_matrix(self, n_in: int, n_out: int, scale: float):
+        """Generate random neural network weight matrix."""
         return [[(random.random() * 2.0 - 1.0) * scale for _ in range(n_out)] for _ in range(n_in)]
 
     def set_inputs(self, inputs):
+        """Override sensory inputs with manual vector for testing."""
         if inputs is None:
             self._inputs_override = None
             return
@@ -108,6 +120,7 @@ class Agent:
         self._inputs_override = [float(v) for v in inputs]
 
     def sense(self, foods=None, agents=None):
+        """Generate normalized sensory input vector."""
         bx = float(self.bound_x) if self.bound_x > 0 else 1.0
         by = float(self.bound_y) if self.bound_y > 0 else 1.0
 
@@ -208,6 +221,7 @@ class Agent:
         ]
 
     def think(self, inputs):
+        """Forward pass through neural network."""
         out = [0.0 for _ in range(self.output_size)]
         for i in range(self.input_size):
             xi = inputs[i]
@@ -231,6 +245,7 @@ class Agent:
         return best_i, turn, intensity
 
     def _apply_bounds(self, new_x: float, new_y: float, new_angle: float):
+        """Apply world boundary conditions with reflection."""
         bx = float(self.bound_x)
         by = float(self.bound_y)
         if bx <= 0 or by <= 0:
@@ -288,6 +303,7 @@ class Agent:
         self.energy = max(0.0, self.energy - 0.05)
 
     def _tick_body(self):
+        """Update age, energy, and HP based on state."""
         self.age += 1
         self.energy = max(0.0, self.energy - 0.01)
         if self.energy <= 0.01:
@@ -348,6 +364,7 @@ class Agent:
         self._tick_body()
 
     def render(self, window: pygame.window, cell_size: int, offset: tuple):
+        """Render agent as triangle with health/energy bars."""
         offset_x, offset_y = offset
 
         env_x = offset_x + self.x
