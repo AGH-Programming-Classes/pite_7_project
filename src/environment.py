@@ -116,7 +116,7 @@ class Environment:
         Agent.bound_x = self.pixel_width
         Agent.bound_y = self.pixel_height
 
-        for _ in range(5):
+        for _ in range(50):
             pos_x = random.randint(0, Agent.bound_x)
             pos_y = random.randint(0, Agent.bound_y)
             agent = Agent((pos_x, pos_y), self)

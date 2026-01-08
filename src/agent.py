@@ -20,8 +20,10 @@ import math
 import random
 import pygame
 import typing
+import logging
 if typing.TYPE_CHECKING:
     from environment import Environment
+import uuid
 
 def _clamp(x: float, lo: float, hi: float) -> float:
     if x < lo:
@@ -57,16 +59,21 @@ class Agent:
 
     body_points_total = 100
 
-    distance_to_partner_to_mate = 3
+    distance_to_partner_to_mate = 0.05
     #parameters to reproduction
     chance_for_mutation = 0.05
     mutation_multiply_border = 0.2 # random.uniform(1-var,1+var)
     mutation_addding_border = 0.05
 
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger()
+
     def __init__(self, position: tuple, environment : Environment,/, decision_matrix : typing.List[typing.List[int]] = None, genome = None ):
         self.environment = environment
         self.x = float(position[0])
         self.y = float(position[1])
+
+        self.uuid = uuid.uuid4()
 
         self.group_id = random.randint(0, 1)  # team/species id (same -> friend, different -> enemy)
 
@@ -77,7 +84,7 @@ class Agent:
 
         self.max_hp = 10.0 + _sqrt_scale(self.body_points["hp"], 2.0)
         self.max_energy = 10.0 + _sqrt_scale(self.body_points["energy"], 2.0)
-        self.base_speed = 0.05 + _sqrt_scale(self.body_points["speed"], 0.02)
+        self.base_speed = 0.5 + _sqrt_scale(self.body_points["speed"], 0.2)
         self.attack_power = 0.5 + _sqrt_scale(self.body_points["attack"], 0.06)
         self.max_age = int(200 + _sqrt_scale(self.body_points["lifespan"], 14.0))
         self.sight = 70.0 + _sqrt_scale(self.body_points["sight"], 6.0)
@@ -362,14 +369,19 @@ class Agent:
         self.last_action = action
 
         if action == self.actions["ACTION_MOVE"]:
+            self.logger.debug(f"Agent - {self.uuid}; action - move")
             self._move(turn, intensity)
         elif action == self.actions["ACTION_IDLE"]:
+            self.logger.debug(f"Agent - {self.uuid}; action - idle")
             self._idle()
         elif action == self.actions["ACTION_FLEE"]:
+            self.logger.debug(f"Agent - {self.uuid}; action - free")
             self._flee(turn, intensity)
         elif action == self.actions["ACTION_MATE"]:
+            self.logger.debug(f"Agent - {self.uuid}; action - mate")
             self._mate()
         else:
+            self.logger.debug(f"Agent - {self.uuid}; action - attack")
             self._attack()
 
         self._tick_body()
@@ -399,8 +411,10 @@ class Agent:
 
         #Normalisation of vector
 
-        val = 100 / sum(vector.values())
-        vector = map(lambda el : el * val, vector)
+        normalisation = 100 / sum(vector.values())
+        for key,value in vector.items():
+            vector[key] = value * normalisation
+
 
         return matrix, vector
         
