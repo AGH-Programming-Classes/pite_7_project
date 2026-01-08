@@ -28,6 +28,7 @@ class Environment:
 
         self.pixel_width = pixel_width
         self.pixel_height = pixel_height
+        self.cell_size = max(1, self.pixel_width // self.grid_width)
 
         self.terrain = generate_terrain(
             width=self.grid_width,
@@ -115,6 +116,7 @@ class Environment:
     def _spawn_initial_agents(self):
         Agent.bound_x = self.pixel_width
         Agent.bound_y = self.pixel_height
+        Agent.cell_size = self.cell_size
 
         for _ in range(5):
             pos_x = random.randint(0, Agent.bound_x)
@@ -169,7 +171,10 @@ class Environment:
                 self.food_items = food_to_keep
 
                 for agent in self.agents:
-                    agent.update()
+                    area = self._get_agent_area(agent)
+                    speed_modifier = getattr(area, "agent_speed_modifier", 1.0)
+                    agent.update(speed_modifier, foods=self.food_items, agents=self.agents)
+                    self._feed_agent(agent)
 
             time.sleep(0.01)
 
@@ -219,3 +224,25 @@ class Environment:
         self.running = False
         if self.simulation_thread.is_alive():
             self.simulation_thread.join(timeout=1.0)
+
+    def _get_agent_area(self, agent: Agent) -> Area:
+        """Maps agent pixel position to the underlying terrain cell."""
+        grid_x = min(self.grid_width - 1, max(0, int(agent.x // self.cell_size)))
+        grid_y = min(self.grid_height - 1, max(0, int(agent.y // self.cell_size)))
+        return self.get_area_at(grid_x, grid_y)
+
+    def _get_agent_grid_pos(self, agent: Agent) -> tuple[int, int]:
+        """Maps agent pixel position to integer grid coordinates."""
+        grid_x = min(self.grid_width - 1, max(0, int(agent.x // self.cell_size)))
+        grid_y = min(self.grid_height - 1, max(0, int(agent.y // self.cell_size)))
+        return grid_x, grid_y
+
+    def _feed_agent(self, agent: Agent) -> None:
+        """If agent stands on food, consume one item and restore energy."""
+        grid_x, grid_y = self._get_agent_grid_pos(agent)
+        for i, food in enumerate(self.food_items):
+            if food.x == grid_x and food.y == grid_y:
+                agent.energy = min(agent.max_energy, agent.energy + food.value)
+                agent.hp = min(agent.max_hp, agent.hp + 0.1 * food.value)
+                del self.food_items[i]
+                break
