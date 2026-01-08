@@ -46,6 +46,7 @@ def _dist2(ax: float, ay: float, bx: float, by: float) -> float:
 class Agent:
     bound_x = 0
     bound_y = 0
+    cell_size = 1
 
     ACTION_MOVE = 0
     ACTION_IDLE = 1
@@ -64,9 +65,9 @@ class Agent:
 
         self.max_hp = 10.0 + _sqrt_scale(self.body_points["hp"], 2.0)
         self.max_energy = 10.0 + _sqrt_scale(self.body_points["energy"], 2.0)
-        self.base_speed = 0.05 + _sqrt_scale(self.body_points["speed"], 0.02)
+        self.base_speed = 1 + _sqrt_scale(self.body_points["speed"], 0.02)
         self.attack_power = 0.5 + _sqrt_scale(self.body_points["attack"], 0.06)
-        self.max_age = int(200 + _sqrt_scale(self.body_points["lifespan"], 14.0))
+        self.max_age = int(500 + _sqrt_scale(self.body_points["lifespan"], 14.0))
         self.sight = 70.0 + _sqrt_scale(self.body_points["sight"], 6.0)
         self.agility = 30.0 + _sqrt_scale(self.body_points["agility"], 2.0)
 
@@ -140,6 +141,8 @@ class Agent:
                 food_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
                 food_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
                 self._last_food = best
+            else:
+                self._last_food = None
 
         friend_count_n = 0.0
         enemy_count_n = 0.0
@@ -295,18 +298,33 @@ class Agent:
     def is_alive(self) -> bool:
         return self.hp > 0.0
 
-    def update(self, speed_modifier: float = 1.0):
+    def update(self, speed_modifier: float = 1.0, foods=None, agents=None):
         if not self.is_alive():
             return
 
         if self._inputs_override is None:
-            inputs = self.sense()
+            inputs = self.sense(foods=foods, agents=agents)
         else:
             inputs = self._inputs_override
 
         outputs = self.think(inputs)
         action, turn, intensity = self.decide(outputs)
         self.last_action = action
+
+        if foods and (self.energy < 0.6 * self.max_energy) and (self._last_food is not None):
+            fx, fy = self._last_food
+            gx = int(self.x // max(1, self.cell_size))
+            gy = int(self.y // max(1, self.cell_size))
+            if abs(int(fx) - gx) + abs(int(fy) - gy) <= 0:
+                self._last_food = None
+            else:
+                dx = float(fx) - self.x
+                dy = float(fy) - self.y
+            desired_ang = math.degrees(math.atan2(-dy, dx)) % 360.0
+            diff = (desired_ang - self.angle + 180.0) % 360.0 - 180.0
+            turn = _clamp(diff / max(1e-6, (self.agility * 0.5)), -1.0, 1.0)
+            intensity = max(intensity, 0.8)
+            action = self.ACTION_MOVE
 
         if action == self.ACTION_MOVE:
             self._move(turn, intensity, speed_modifier)
