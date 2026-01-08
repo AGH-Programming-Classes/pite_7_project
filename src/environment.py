@@ -28,6 +28,7 @@ class Environment:
 
         self.pixel_width = pixel_width
         self.pixel_height = pixel_height
+        self.cell_size = max(1, self.pixel_width // self.grid_width)
 
         self.terrain = generate_terrain(
             width=self.grid_width,
@@ -169,7 +170,9 @@ class Environment:
                 self.food_items = food_to_keep
 
                 for agent in self.agents:
-                    agent.update()
+                    area = self._get_agent_area(agent)
+                    speed_modifier = getattr(area, "agent_speed_modifier", 1.0)
+                    agent.update(speed_modifier)
 
             time.sleep(0.01)
 
@@ -219,3 +222,9 @@ class Environment:
         self.running = False
         if self.simulation_thread.is_alive():
             self.simulation_thread.join(timeout=1.0)
+
+    def _get_agent_area(self, agent: Agent) -> Area:
+        """Maps agent pixel position to the underlying terrain cell."""
+        grid_x = min(self.grid_width - 1, max(0, int(agent.x // self.cell_size)))
+        grid_y = min(self.grid_height - 1, max(0, int(agent.y // self.cell_size)))
+        return self.get_area_at(grid_x, grid_y)

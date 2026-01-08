@@ -249,34 +249,34 @@ class Agent:
         self.y = max(0.0, min(new_y, max_y))
         self.angle = new_angle % 360.0
 
-    def _move(self, turn: float, intensity: float):
+    def _move(self, turn: float, intensity: float, speed_modifier: float = 1.0):
         turn_delta = turn * (self.agility * 0.5)
         new_angle = self.angle + turn_delta
 
         inten = _clamp(0.5 + 0.5 * intensity, 0.0, 1.0)
-        sp = self.base_speed * (0.20 + 1.30 * inten)
+        sp = self.base_speed * (0.20 + 1.30 * inten) * speed_modifier
 
         rad = math.radians(new_angle)
         new_x = self.x + math.cos(rad) * sp
         new_y = self.y - math.sin(rad) * sp
         self._apply_bounds(new_x, new_y, new_angle)
 
-        cost = 0.02 + 0.06 * inten
+        cost = (0.02 + 0.06 * inten) * max(0.1, speed_modifier)
         self.energy = max(0.0, self.energy - cost)
 
     def _idle(self):
         self.energy = min(self.max_energy, self.energy + 0.03)
 
-    def _flee(self, turn: float, intensity: float):
+    def _flee(self, turn: float, intensity: float, speed_modifier: float = 1.0):
         if self._last_enemy is None:
-            self._move(turn, intensity)
+            self._move(turn, intensity, speed_modifier)
             return
         ex, ey = self._last_enemy
         dx = self.x - float(ex)
         dy = self.y - float(ey)
         ang = math.degrees(math.atan2(-dy, dx))
         self.angle = ang % 360.0
-        self._move(0.0, max(0.2, intensity))
+        self._move(0.0, max(0.2, intensity), speed_modifier)
 
     def _attack(self):
         self.energy = max(0.0, self.energy - 0.08)
@@ -295,7 +295,7 @@ class Agent:
     def is_alive(self) -> bool:
         return self.hp > 0.0
 
-    def update(self):
+    def update(self, speed_modifier: float = 1.0):
         if not self.is_alive():
             return
 
@@ -309,11 +309,11 @@ class Agent:
         self.last_action = action
 
         if action == self.ACTION_MOVE:
-            self._move(turn, intensity)
+            self._move(turn, intensity, speed_modifier)
         elif action == self.ACTION_IDLE:
             self._idle()
         elif action == self.ACTION_FLEE:
-            self._flee(turn, intensity)
+            self._flee(turn, intensity, speed_modifier)
         elif action == self.ACTION_MATE:
             self._mate()
         else:
