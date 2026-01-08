@@ -311,20 +311,28 @@ class Agent:
         action, turn, intensity = self.decide(outputs)
         self.last_action = action
 
-        if foods and (self.energy < 0.6 * self.max_energy) and (self._last_food is not None):
-            fx, fy = self._last_food
-            gx = int(self.x // max(1, self.cell_size))
-            gy = int(self.y // max(1, self.cell_size))
-            if abs(int(fx) - gx) + abs(int(fy) - gy) <= 0:
+        if foods and (self.energy < 0.25 * self.max_energy) and (self._last_food is not None):
+            food_exists = any(f.x == self._last_food[0] and f.y == self._last_food[1] for f in foods)
+            if not food_exists:
                 self._last_food = None
             else:
-                dx = float(fx) - self.x
-                dy = float(fy) - self.y
-            desired_ang = math.degrees(math.atan2(-dy, dx)) % 360.0
-            diff = (desired_ang - self.angle + 180.0) % 360.0 - 180.0
-            turn = _clamp(diff / max(1e-6, (self.agility * 0.5)), -1.0, 1.0)
-            intensity = max(intensity, 0.8)
-            action = self.ACTION_MOVE
+                fx, fy = self._last_food
+                gx = int(self.x // max(1, self.cell_size))
+                gy = int(self.y // max(1, self.cell_size))
+                if abs(int(fx) - gx) + abs(int(fy) - gy) <= 0:
+                    self._last_food = None
+                else:
+                    dx = float(fx) - self.x
+                    dy = float(fy) - self.y
+                    desired_ang = math.degrees(math.atan2(-dy, dx)) % 360.0
+                    diff = (desired_ang - self.angle + 180.0) % 360.0 - 180.0
+                    turn = _clamp(diff / max(1e-6, (self.agility * 0.5)), -1.0, 1.0)
+                    intensity = max(intensity, 0.8)
+                    action = self.ACTION_MOVE
+        else:
+            if action == self.ACTION_MOVE and random.random() < 0.1:
+                turn = turn + (random.random() - 0.5) * 0.3
+                turn = _clamp(turn, -1.0, 1.0)
 
         if action == self.ACTION_MOVE:
             self._move(turn, intensity, speed_modifier)
