@@ -65,7 +65,7 @@ class Agent:
     mutation_multiply_border = 0.2 # random.uniform(1-var,1+var)
     mutation_addding_border = 0.05
 
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
 
     def __init__(self, position: tuple, environment : Environment,/, decision_matrix : typing.List[typing.List[int]] = None, genome = None ):
@@ -83,10 +83,10 @@ class Agent:
             self.body_points = self._random_body_points(self.body_points_total)
 
         self.max_hp = 10.0 + _sqrt_scale(self.body_points["hp"], 2.0)
-        self.max_energy = 10.0 + _sqrt_scale(self.body_points["energy"], 2.0)
+        self.max_energy = (10.0 + _sqrt_scale(self.body_points["energy"], 2.0)) * 5
         self.base_speed = 0.5 + _sqrt_scale(self.body_points["speed"], 0.2)
         self.attack_power = 0.5 + _sqrt_scale(self.body_points["attack"], 0.06)
-        self.max_age = int(200 + _sqrt_scale(self.body_points["lifespan"], 14.0))
+        self.max_age = int(200 + _sqrt_scale(self.body_points["lifespan"], 14.0)) * 5
         self.sight = 70.0 + _sqrt_scale(self.body_points["sight"], 6.0)
         self.agility = 30.0 + _sqrt_scale(self.body_points["agility"], 2.0)
 

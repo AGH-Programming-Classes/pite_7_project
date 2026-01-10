@@ -226,3 +226,4 @@ class Environment:
     #This function should deal with creating new agents
     def create_agent(self, agent : Agent):
         pass
+        # self.agents.append(agent)
