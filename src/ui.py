@@ -65,4 +65,12 @@ class UI:
         )
         
     def process_events(self, event: pygame.Event, env: Environment):
-       pass 
+        if event.type == pygame_gui.UI_BUTTON_PRESSED:
+            match event.ui_element:
+                case self.resume_btn:
+                    env.resume()
+                case self.pause_btn:
+                    env.pause()
+                case self.reset_btn:
+                    # TODO reset simulation
+                    pass

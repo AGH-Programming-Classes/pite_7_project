@@ -21,6 +21,7 @@ class Environment:
     def __init__(self, grid_width: int, grid_height: int, pixel_width: int, pixel_height: int):
         self.tick_counter = 0
         self.running = True
+        self.pause_sim = False
 
         self.grid_width = grid_width
         self.grid_height = grid_height
@@ -126,6 +127,10 @@ class Environment:
 
     def _simulation_loop(self):
         while self.running:
+            time.sleep(0.01)
+
+            if self.pause_sim:
+                continue
             with self.data_lock:
                 self.tick_counter += 1
 
@@ -176,7 +181,6 @@ class Environment:
                     agent.update(speed_modifier)
                     self._feed_agent(agent)
 
-            time.sleep(0.01)
 
     def set_grid_cell(self, x: int, y: int, value: int):
         if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
@@ -224,6 +228,12 @@ class Environment:
         self.running = False
         if self.simulation_thread.is_alive():
             self.simulation_thread.join(timeout=1.0)
+
+    def pause(self):
+        self.pause_sim = True
+
+    def resume(self):
+        self.pause_sim = False
 
     def get_agents(self):
         return self.agents
