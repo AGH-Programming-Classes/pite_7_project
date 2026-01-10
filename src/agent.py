@@ -3,6 +3,33 @@
 import math
 import random
 import pygame
+import typing
+import logging
+if typing.TYPE_CHECKING:
+    from environment import Environment
+import uuid
+
+def _clamp(x: float, lo: float, hi: float) -> float:
+    if x < lo:
+        return lo
+    if x > hi:
+        return hi
+    return x
+
+
+def _tanh(x: float) -> float:
+    return math.tanh(x)
+
+
+def _sqrt_scale(points: float, k: float) -> float:
+    return k * math.sqrt(max(0.0, points))
+
+
+def _dist2(ax: float, ay: float, bx: float, by: float) -> float:
+    dx = ax - bx
+    dy = ay - by
+    return dx * dx + dy * dy
+
 
 
 def _clamp(x: float, lo: float, hi: float) -> float:
@@ -55,28 +82,43 @@ class Agent:
     bound_y = 0
     cell_size = 1
 
-    ACTION_MOVE = 0
-    ACTION_IDLE = 1
-    ACTION_FLEE = 2
-    ACTION_MATE = 3
-    ACTION_ATTACK = 4
 
-    def __init__(self, position: tuple):
-        """Initialize agent at position with random stats and neural weights."""
+    actions = {"ACTION_MOVE" : 0,
+    "ACTION_IDLE" : 1,
+    "ACTION_FLEE" : 2,
+    "ACTION_MATE" : 3,
+    "ACTION_ATTACK" : 4}
+
+    body_points_total = 100
+
+    distance_to_partner_to_mate = 0.05
+    #parameters to reproduction
+    chance_for_mutation = 0.05
+    mutation_multiply_border = 0.2 # random.uniform(1-var,1+var)
+    mutation_addding_border = 0.05
+
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger()
+
+    def __init__(self, position: tuple, environment : Environment,/, decision_matrix : typing.List[typing.List[int]] = None, genome = None ):
+        self.environment = environment
         self.x = float(position[0])
         self.y = float(position[1])
 
-        # team/species id (same -> friend, different -> enemy)
-        self.group_id = random.randint(0, 1)
+        self.uuid = uuid.uuid4()
 
-        self.body_points_total = 100
-        self.body_points = self._random_body_points(self.body_points_total)
+        self.group_id = random.randint(0, 1)  # team/species id (same -> friend, different -> enemy)
+
+        if genome:
+            self.body_points = genome
+        else:
+            self.body_points = self._random_body_points(self.body_points_total)
 
         self.max_hp = 10.0 + _sqrt_scale(self.body_points["hp"], 2.0)
-        self.max_energy = 10.0 + _sqrt_scale(self.body_points["energy"], 2.0)
-        self.base_speed = 1 + _sqrt_scale(self.body_points["speed"], 0.02)
+        self.max_energy = (10.0 + _sqrt_scale(self.body_points["energy"], 2.0)) * 5
+        self.base_speed = 0.5 + _sqrt_scale(self.body_points["speed"], 0.2)
         self.attack_power = 0.5 + _sqrt_scale(self.body_points["attack"], 0.06)
-        self.max_age = int(500 + _sqrt_scale(self.body_points["lifespan"], 14.0))
+        self.max_age = int(200 + _sqrt_scale(self.body_points["lifespan"], 14.0)) * 5
         self.sight = 70.0 + _sqrt_scale(self.body_points["sight"], 6.0)
         self.agility = 30.0 + _sqrt_scale(self.body_points["agility"], 2.0)
 
@@ -85,13 +127,16 @@ class Agent:
         self.age = 0
 
         self.angle = random.random() * 360.0
-        self.last_action = self.ACTION_MOVE
+        self.last_action = self.actions["ACTION_MOVE"]
 
-        self.input_size = 16
-        self.action_count = 5
+        self.input_size = len(self.sense())
+        self.action_count = len(self.actions)
         self.output_size = self.action_count + 2
 
-        self.weights = self._random_matrix(self.input_size, self.output_size, scale=0.6)
+        if decision_matrix:
+            self.weights = decision_matrix
+        else:
+            self.weights = self._random_matrix(self.input_size, self.output_size, scale=0.6)
 
 
         self._inputs_override = None
@@ -135,7 +180,7 @@ class Agent:
         head_x = math.cos(ang)  # facing direction (unit vector)
         head_y = -math.sin(ang)
 
-        food_d_n, food_dx_n, food_dy_n = 1.0, 0.0, 0.0
+        food_d_n, food_dx_n, food_dy_n, food_in_sigth = 1.0, 0.0, 0.0, 0
         if foods:
             best_d2 = 1e18
             best = None
@@ -154,10 +199,11 @@ class Agent:
                 food_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
                 food_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
                 self._last_food = best
-            else:
-                self._last_food = None
+                if d <= self.sight: # Adding boolean to deal with semantic discontinuity ( 1 could mean food is far away and 0,95 mean is really close)
+                    food_in_sigth = 1
 
         friend_count_n = 0.0
+        friend_d_n, friend_dx_n, friend_dy_n = 1.0, 0.0, 0.0
         enemy_count_n = 0.0
         enemy_d_n, enemy_dx_n, enemy_dy_n = 1.0, 0.0, 0.0
 
@@ -165,6 +211,8 @@ class Agent:
             r2 = self.sight * self.sight
             friends = 0
             enemies = 0
+            best_friend_d2 = 1e18
+            best_friend = None 
             best_enemy_d2 = 1e18
             best_enemy = None
 
@@ -180,6 +228,9 @@ class Agent:
                 same_group = getattr(a, "group_id", None) == self.group_id
                 if same_group:
                     friends += 1
+                    if d2 < best_friend_d2:
+                        best_friend_d2 = d2
+                        best_friend = (ax, ay)
                 else:
                     enemies += 1
                     if d2 < best_enemy_d2:
@@ -200,6 +251,20 @@ class Agent:
             else:
                 self._last_enemy = None
 
+            
+            if best_friend is not None: # Adding this part to enable to agent getting information where are friends
+                dx = best_friend[0] - self.x
+                dy = best_friend[1] - self.y
+                d = math.sqrt(best_friend_d2)
+                friend_d_n = _clamp(d / max(1e-9, self.sight), 0.0, 1.0)
+                friend_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
+                friend_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
+                self._last_friend = best_friend
+            else:
+                self._last_friend = None
+
+            
+
 
         return [
             hp_n,
@@ -212,7 +277,11 @@ class Agent:
             food_d_n,
             food_dx_n,
             food_dy_n,
+            food_in_sigth,
             friend_count_n,
+            friend_d_n,
+            friend_dx_n,
+            friend_dy_n,
             enemy_count_n,
             enemy_d_n,
             enemy_dx_n,
@@ -279,31 +348,40 @@ class Agent:
         new_y = self.y - math.sin(rad) * sp
         self._apply_bounds(new_x, new_y, new_angle)
 
-        cost = (0.02 + 0.06 * inten) * max(0.1, speed_modifier)
+        cost = 0.02 + 0.06 * inten
         self.energy = max(0.0, self.energy - cost)
 
     def _idle(self):
-        self.energy = min(self.max_energy, self.energy + 0.03)
+        self.energy = min(self.max_energy, self.energy - 0.01)
 
-    def _flee(self, turn: float, intensity: float, speed_modifier: float = 1.0):
+    def _flee(self, turn: float, intensity: float):
         if self._last_enemy is None:
-            self._move(turn, intensity, speed_modifier)
+            self._move(turn, intensity)
             return
         ex, ey = self._last_enemy
         dx = self.x - float(ex)
         dy = self.y - float(ey)
         ang = math.degrees(math.atan2(-dy, dx))
         self.angle = ang % 360.0
-        self._move(0.0, max(0.2, intensity), speed_modifier)
+        self._move(0.0, max(0.2, intensity))
 
     def _attack(self):
         self.energy = max(0.0, self.energy - 0.08)
 
     def _mate(self):
-        self.energy = max(0.0, self.energy - 0.05)
+        from environment import Environment
+        self.energy = max(0.0, self.energy - 0.3)
+        agents : typing.List[Agent] = self.environment.get_agents()
+        close_agents : typing.List[Agent] = []
+        for ag in agents:
+            if _dist2(ag.x, ag.y, self.x, self.y) < self.distance_to_partner_to_mate:
+                close_agents.append(ag)
+        if len(close_agents) > 0:
+            matrix, vector = self.create_new_genes( random.choice(close_agents))
+            self.environment.create_agent(Agent((self.x, self.y), self.environment, decision_matrix = matrix, genome = vector))
+
 
     def _tick_body(self):
-        """Update age, energy, and HP based on state."""
         self.age += 1
         self.energy = max(0.0, self.energy - 0.01)
         if self.energy <= 0.01:
@@ -314,12 +392,12 @@ class Agent:
     def is_alive(self) -> bool:
         return self.hp > 0.0
 
-    def update(self, speed_modifier: float = 1.0, foods=None, agents=None):
+    def update(self):
         if not self.is_alive():
             return
 
         if self._inputs_override is None:
-            inputs = self.sense(foods=foods, agents=agents)
+            inputs = self.sense()
         else:
             inputs = self._inputs_override
 
@@ -327,44 +405,70 @@ class Agent:
         action, turn, intensity = self.decide(outputs)
         self.last_action = action
 
-        if foods and (self.energy < 0.25 * self.max_energy) and (self._last_food is not None):
-            food_exists = any(f.x == self._last_food[0] and f.y == self._last_food[1] for f in foods)
-            if not food_exists:
-                self._last_food = None
-            else:
-                fx, fy = self._last_food
-                gx = int(self.x // max(1, self.cell_size))
-                gy = int(self.y // max(1, self.cell_size))
-                if abs(int(fx) - gx) + abs(int(fy) - gy) <= 0:
-                    self._last_food = None
-                else:
-                    dx = float(fx) - self.x
-                    dy = float(fy) - self.y
-                    desired_ang = math.degrees(math.atan2(-dy, dx)) % 360.0
-                    diff = (desired_ang - self.angle + 180.0) % 360.0 - 180.0
-                    turn = _clamp(diff / max(1e-6, (self.agility * 0.5)), -1.0, 1.0)
-                    intensity = max(intensity, 0.8)
-                    action = self.ACTION_MOVE
-        else:
-            if action == self.ACTION_MOVE and random.random() < 0.1:
-                turn = turn + (random.random() - 0.5) * 0.3
-                turn = _clamp(turn, -1.0, 1.0)
-
-        if action == self.ACTION_MOVE:
-            self._move(turn, intensity, speed_modifier)
-        elif action == self.ACTION_IDLE:
+        if action == self.actions["ACTION_MOVE"]:
+            self.logger.debug(f"Agent - {self.uuid}; action - move")
+            self._move(turn, intensity)
+        elif action == self.actions["ACTION_IDLE"]:
+            self.logger.debug(f"Agent - {self.uuid}; action - idle")
             self._idle()
-        elif action == self.ACTION_FLEE:
-            self._flee(turn, intensity, speed_modifier)
-        elif action == self.ACTION_MATE:
+        elif action == self.actions["ACTION_FLEE"]:
+            self.logger.debug(f"Agent - {self.uuid}; action - free")
+            self._flee(turn, intensity)
+        elif action == self.actions["ACTION_MATE"]:
+            self.logger.debug(f"Agent - {self.uuid}; action - mate")
             self._mate()
         else:
+            self.logger.debug(f"Agent - {self.uuid}; action - attack")
             self._attack()
 
         self._tick_body()
 
+    def create_new_genes(self, second : Agent):
+        matrix =  self.create_new_decision_matrix(second)
+        vector = self.create_new_genome_vector(second)
+
+        numbers_to_change_in_matrix = int(len(matrix) * len(matrix[0]) / (1 / self.chance_for_mutation))
+
+        #Applying mutation - there could be multiply of value or adding
+
+        for _ in range(numbers_to_change_in_matrix):
+            row = random.choice(matrix)
+            i = random.randint(0, len(row)-1)
+            if random.random() < 0.2:
+                row[i] *= random.uniform(1 - self.mutation_multiply_border, 1 + self.mutation_multiply_border)
+            else:
+                row[i] += random.uniform(-self.mutation_addding_border, self.mutation_addding_border)
+
+        for _ in range(int(len(vector) / (1 / self.chance_for_mutation))):
+            item = random.choice(vector.keys())
+            if random.random() < 0.2:
+                vector[item] *= random.uniform(1 - self.mutation_multiply_border, 1 + self.mutation_multiply_border)
+            else:
+                vector[item] += random.uniform(-self.mutation_addding_border, self.mutation_addding_border)
+
+        #Normalisation of vector
+
+        normalisation = 100 / sum(vector.values())
+        for key,value in vector.items():
+            vector[key] = value * normalisation
+
+
+        return matrix, vector
+        
+    def create_new_decision_matrix(self, second : Agent):
+        output = []
+        for i in range(len(self.weights)):
+            number = random.randint(0, len(self.weights[0]))
+            output.append(self.weights[i][:number] + self.weights[i][number:])
+        return output
+
+    def create_new_genome_vector(self, second : Agent):
+        genome = self.body_points.copy()
+        for item in genome.keys():
+            genome[item] = self.body_points[item] if random.randint(0,1) == 1 else second.body_points[item]
+        return genome
+
     def render(self, window: pygame.window, cell_size: int, offset: tuple):
-        """Render agent as triangle with health/energy bars."""
         offset_x, offset_y = offset
 
         env_x = offset_x + self.x

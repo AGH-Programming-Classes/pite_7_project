@@ -118,10 +118,10 @@ class Environment:
         Agent.bound_y = self.pixel_height
         Agent.cell_size = self.cell_size
 
-        for _ in range(5):
+        for _ in range(50):
             pos_x = random.randint(0, Agent.bound_x)
             pos_y = random.randint(0, Agent.bound_y)
-            agent = Agent((pos_x, pos_y))
+            agent = Agent((pos_x, pos_y), self)
             self.agents.append(agent)
 
     def _simulation_loop(self):
@@ -225,6 +225,13 @@ class Environment:
         if self.simulation_thread.is_alive():
             self.simulation_thread.join(timeout=1.0)
 
+    def get_agents(self):
+        return self.agents
+    
+    #This function should deal with creating new agents
+    def create_agent(self, agent : Agent):
+        pass
+        # self.agents.append(agent)
     def _get_agent_area(self, agent: Agent) -> Area:
         """Maps agent pixel position to the underlying terrain cell."""
         grid_x = min(self.grid_width - 1, max(0, int(agent.x // self.cell_size)))
