@@ -10,28 +10,6 @@ if typing.TYPE_CHECKING:
     from environment import Environment
 import uuid
 
-def _clamp(x: float, lo: float, hi: float) -> float:
-    if x < lo:
-        return lo
-    if x > hi:
-        return hi
-    return x
-
-
-def _tanh(x: float) -> float:
-    return math.tanh(x)
-
-
-def _sqrt_scale(points: float, k: float) -> float:
-    return k * math.sqrt(max(0.0, points))
-
-
-def _dist2(ax: float, ay: float, bx: float, by: float) -> float:
-    dx = ax - bx
-    dy = ay - by
-    return dx * dx + dy * dy
-
-
 
 def _clamp(x: float, lo: float, hi: float) -> float:
     """Clamps value x between lo and hi."""
@@ -52,8 +30,8 @@ def _sqrt_scale(points: float, k: float) -> float:
     return k * math.sqrt(max(0.0, points))
 
 
-def _dist2(ax: float, ay: float, bx: float, by: float) -> float:
-    """Returns squared Euclidean distance between (ax, ay) and (bx, by)."""
+def dist2(ax: float, ay: float, bx: float, by: float) -> float:
+    """Returns squared Euclidean dist2ance between (ax, ay) and (bx, by)."""
     dx = ax - bx
     dy = ay - by
     return dx * dx + dy * dy
@@ -70,12 +48,12 @@ class Agent:
     # 4  y_n             -> y position normalized to world height (0..1)
     # 5  head_x          -> facing direction x (cos(angle))
     # 6  head_y          -> facing direction y (-sin(angle))
-    # 7  food_d_n        -> distance to nearest food normalized by sight (0..1)
+    # 7  food_d_n        -> dist2ance to nearest food normalized by sight (0..1)
     # 8  food_dx_n       -> x direction to nearest food (normalized)
     # 9  food_dy_n       -> y direction to nearest food (normalized)
     # 10 friend_count_n  -> nearby friends count (normalized)
     # 11 enemy_count_n   -> nearby enemies count (normalized)
-    # 12 enemy_d_n       -> distance to nearest enemy normalized by sight (0..1)
+    # 12 enemy_d_n       -> dist2ance to nearest enemy normalized by sight (0..1)
     # 13 enemy_dx_n      -> x direction to nearest enemy (normalized)
     # 14 enemy_dy_n      -> y direction to nearest enemy (normalized)
     # 15 bias            -> constant bias input (always 1.0)
@@ -92,17 +70,14 @@ class Agent:
 
     body_points_total = 100
 
-    distance_to_partner_to_mate = 0.05
-    #parameters to reproduction
-    chance_for_mutation = 0.05
-    mutation_multiply_border = 0.2 # random.uniform(1-var,1+var)
-    mutation_addding_border = 0.05
-
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
 
     def __init__(self, position: tuple, environment : Environment,/, decision_matrix : typing.List[typing.List[int]] = None, genome = None ):
+        from mating import Mating
+
         self.environment = environment
+        self.mate_module :Mating = Mating(self)
         self.x = float(position[0])
         self.y = float(position[1])
 
@@ -145,7 +120,7 @@ class Agent:
         self._last_food = None
 
     def _random_body_points(self, total: int):
-        """Randomly distribute total points across body stat keys."""
+        """Randomly dist2ribute total points across body stat keys."""
         keys = ["hp", "energy", "speed", "attack", "lifespan", "sight", "agility"]
         pts = {k: 0 for k in keys}
         for _ in range(total):
@@ -188,7 +163,7 @@ class Agent:
             for f in foods:
                 fx = float(getattr(f, "x", 0.0))
                 fy = float(getattr(f, "y", 0.0))
-                d2 = _dist2(self.x, self.y, fx, fy)
+                d2 = dist2(self.x, self.y, fx, fy)
                 if d2 < best_d2:
                     best_d2 = d2
                     best = (fx, fy)
@@ -222,7 +197,7 @@ class Agent:
                     continue
                 ax = float(getattr(a, "x", 0.0))
                 ay = float(getattr(a, "y", 0.0))
-                d2 = _dist2(self.x, self.y, ax, ay)
+                d2 = dist2(self.x, self.y, ax, ay)
                 if d2 > r2:
                     continue
 
@@ -370,16 +345,7 @@ class Agent:
         self.energy = max(0.0, self.energy - 0.08)
 
     def _mate(self):
-        from environment import Environment
-        self.energy = max(0.0, self.energy - 0.3)
-        agents : typing.List[Agent] = self.environment.get_agents()
-        close_agents : typing.List[Agent] = []
-        for ag in agents:
-            if _dist2(ag.x, ag.y, self.x, self.y) < self.distance_to_partner_to_mate:
-                close_agents.append(ag)
-        if len(close_agents) > 0:
-            matrix, vector = self.create_new_genes( random.choice(close_agents))
-            self.environment.create_agent(Agent((self.x, self.y), self.environment, decision_matrix = matrix, genome = vector))
+        self.mate_module.mate()
 
 
     def _tick_body(self):
@@ -423,51 +389,6 @@ class Agent:
             self._attack()
 
         self._tick_body()
-
-    def create_new_genes(self, second : Agent):
-        matrix =  self.create_new_decision_matrix(second)
-        vector = self.create_new_genome_vector(second)
-
-        numbers_to_change_in_matrix = int(len(matrix) * len(matrix[0]) / (1 / self.chance_for_mutation))
-
-        #Applying mutation - there could be multiply of value or adding
-
-        for _ in range(numbers_to_change_in_matrix):
-            row = random.choice(matrix)
-            i = random.randint(0, len(row)-1)
-            if random.random() < 0.2:
-                row[i] *= random.uniform(1 - self.mutation_multiply_border, 1 + self.mutation_multiply_border)
-            else:
-                row[i] += random.uniform(-self.mutation_addding_border, self.mutation_addding_border)
-
-        for _ in range(int(len(vector) / (1 / self.chance_for_mutation))):
-            item = random.choice(vector.keys())
-            if random.random() < 0.2:
-                vector[item] *= random.uniform(1 - self.mutation_multiply_border, 1 + self.mutation_multiply_border)
-            else:
-                vector[item] += random.uniform(-self.mutation_addding_border, self.mutation_addding_border)
-
-        #Normalisation of vector
-
-        normalisation = 100 / sum(vector.values())
-        for key,value in vector.items():
-            vector[key] = value * normalisation
-
-
-        return matrix, vector
-        
-    def create_new_decision_matrix(self, second : Agent):
-        output = []
-        for i in range(len(self.weights)):
-            number = random.randint(0, len(self.weights[0]))
-            output.append(self.weights[i][:number] + self.weights[i][number:])
-        return output
-
-    def create_new_genome_vector(self, second : Agent):
-        genome = self.body_points.copy()
-        for item in genome.keys():
-            genome[item] = self.body_points[item] if random.randint(0,1) == 1 else second.body_points[item]
-        return genome
 
     def render(self, window: pygame.window, cell_size: int, offset: tuple):
         offset_x, offset_y = offset

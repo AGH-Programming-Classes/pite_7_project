@@ -16,3 +16,10 @@ PANEL_HEIGHT = cfg["panel"]["height"]
 CELL_SIZE = cfg["grid"]["cell_size"]
 GRID_WIDTH = PANEL_WIDTH // CELL_SIZE
 GRID_HEIGHT = PANEL_HEIGHT // CELL_SIZE
+
+MIN_AGE_PERCENT = cfg["mating"]["min_age_percent"]
+MIN_ENERGY_LEVEL = cfg["mating"]["min_energy_level"]
+MAX_RANGE = cfg["mating"]["max_range"]
+MUTATION_CHANCE = cfg["mating"]["mutation_chance"]
+MUTATION_MULTIPLY_BORDER = cfg["mating"]["mutation_multiply_border"] 
+MUTATION_ADDING_BORDER = cfg["mating"]["mutation_addding_border"]

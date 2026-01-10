@@ -8,3 +8,10 @@ panel:
   y: 50
 grid:
   cell_size: 25
+mating:
+  min_age_percent: 0.2
+  min_energy_level: 0.75
+  max_range: 5
+  mutation_chance: 0.05
+  mutation_multiply_border: 0.2 
+  mutation_addding_border: 0.05
