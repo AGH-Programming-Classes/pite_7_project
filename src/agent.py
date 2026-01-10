@@ -1,5 +1,6 @@
 """Agent module containing the Agent class and related utilities for simulation."""
-
+from __future__ import annotations
+from food import FoodSource
 import math
 import random
 import pygame
@@ -392,7 +393,7 @@ class Agent:
     def is_alive(self) -> bool:
         return self.hp > 0.0
 
-    def update(self):
+    def update(self, speed_modifier):
         if not self.is_alive():
             return
 

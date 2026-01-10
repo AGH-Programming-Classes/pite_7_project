@@ -173,7 +173,7 @@ class Environment:
                 for agent in self.agents:
                     area = self._get_agent_area(agent)
                     speed_modifier = getattr(area, "agent_speed_modifier", 1.0)
-                    agent.update(speed_modifier, foods=self.food_items, agents=self.agents)
+                    agent.update(speed_modifier)
                     self._feed_agent(agent)
 
             time.sleep(0.01)
