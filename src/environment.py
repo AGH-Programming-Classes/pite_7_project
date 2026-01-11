@@ -5,10 +5,11 @@ import time
 import random
 from typing import List, Tuple
 import pygame
-from food import SimpleGrassPatch, Food, BerryBush, FertileFruitTree, CactusPads
+from food import FoodSource, SimpleGrassPatch, Food, BerryBush, FertileFruitTree, CactusPads
 from agent import Agent
 from area import Area
 from terrain import generate_terrain
+from typing import Type
 
 class Environment:
     """
@@ -68,17 +69,17 @@ class Environment:
 
             self.food_items = [f for f in self.food_items if not (f.x == x and f.y == y)]
 
-    def add_manual_food_source(self, grid_x: int, grid_y: int, source_type: str):
+    def add_manual_food_source(self, grid_x: int, grid_y: int, source_type: Type[FoodSource]):
         mapping = {
-            "Grass": (SimpleGrassPatch, Area.PLAINS),
-            "Berry": (BerryBush, Area.BERRY_CORNER),
-            "Fruit": (FertileFruitTree, Area.FERTILE_VALLEY),
-            "Cactus": (CactusPads, Area.DESERT)
+            SimpleGrassPatch: Area.PLAINS,
+            BerryBush: Area.BERRY_CORNER,
+            FertileFruitTree: Area.FERTILE_VALLEY,
+            CactusPads: Area.DESERT
         }
 
         if source_type not in mapping:
             return
-        cls, target_area = mapping[source_type]
+        cls, target_area = source_type, mapping[source_type]
 
         self._cleanup_at(grid_x, grid_y)
 
