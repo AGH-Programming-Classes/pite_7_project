@@ -56,6 +56,46 @@ class Environment:
             [0 for _ in range(self.grid_width)] for _ in range(self.grid_height)
         ]
 
+    def _cleanup_at(self, x: int, y: int):
+        """Deletes food source and all food it has generated at location (x, y)."""
+        with self.data_lock:
+            for fs in self.food_sources:
+                if fs.x == x and fs.y == y:
+                    fs.destroy()
+
+            self.food_sources = [fs for fs in self.food_sources if not fs.is_destroyed]
+
+            self.food_items = [f for f in self.food_items if not (f.x == x and f.y == y)]
+
+    def add_manual_food_source(self, grid_x: int, grid_y: int, source_type: str):
+        mapping = {
+            "Grass": (SimpleGrassPatch, Area.PLAINS),
+            "Berry": (BerryBush, Area.BERRY_CORNER),
+            "Fruit": (FertileFruitTree, Area.FERTILE_VALLEY),
+            "Cactus": (CactusPads, Area.DESERT)
+        }
+
+        if source_type not in mapping:
+            return
+        cls, target_area = mapping[source_type]
+
+        self._cleanup_at(grid_x, grid_y)
+
+        with self.data_lock:
+            if 0 <= grid_x < self.grid_width and 0 <= grid_y < self.grid_height:
+                self.terrain[grid_y][grid_x] = target_area
+                new_source = cls(position=(grid_x, grid_y),
+                                 area=target_area,
+                                 env_area_counters=self.area_food_sources)
+                self.food_sources.append(new_source)
+                self.area_food_sources[target_area] += 1
+
+    def change_area_at(self, grid_x: int, grid_y: int, new_area: Area):
+        self._cleanup_at(grid_x, grid_y)
+
+        with self.data_lock:
+            if 0 <= grid_x < self.grid_width and 0 <= grid_y < self.grid_height:
+                self.terrain[grid_y][grid_x] = new_area
     def is_food_source_at(self, x: int, y: int) -> bool:
         """Returns if food_source at location"""
         return any(fs.x == x and fs.y == y and not fs.is_destroyed for fs in self.food_sources)
@@ -227,7 +267,7 @@ class Environment:
 
     def get_agents(self):
         return self.agents
-    
+
     #This function should deal with creating new agents
     def create_agent(self, agent : Agent):
         pass
