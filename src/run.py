@@ -6,6 +6,7 @@ import config
 from environment import Environment
 from area import Area
 
+from ui import UI
 
 pygame.init()
 pygame.display.set_caption("Simulation")
@@ -13,6 +14,13 @@ screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
 
 clock = pygame.time.Clock()
 manager = pygame_gui.UIManager((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
+env_ui = UI(
+    manager=manager,
+    x=config.PANEL_WIDTH + 2*config.PANEL_X,
+    y=0,
+    width=config.WINDOW_WIDTH - (config.PANEL_WIDTH + 2*config.PANEL_X),
+    height=config.WINDOW_HEIGHT
+)
 
 FOOD_COLORS = {
     "Grass": (100, 200, 100),
@@ -93,6 +101,7 @@ while running:
                     else:
                         env.add_manual_food_source(grid_x, grid_y, current_brush)
         manager.process_events(event)
+        env_ui.process_events(event, env)
 
     manager.update(dt)
 
