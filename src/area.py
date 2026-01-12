@@ -1,4 +1,5 @@
 from enum import Enum
+import food
 
 class Area(Enum):
     PLAINS = {"id": 1,
@@ -39,3 +40,10 @@ class Area(Enum):
         self.expansion_chance = config["expansion_chance"]
         self.color = config["color"]
         self.max_food_sources = config["max_food_sources"]
+
+AREA_FOOD_SOURCE_MAPPING = {
+    Area.PLAINS: food.SimpleGrassPatch,
+    Area.FERTILE_VALLEY: food.FertileFruitTree,
+    Area.DESERT: food.CactusPads,
+    Area.BERRY_CORNER: food.BerryBush
+}
