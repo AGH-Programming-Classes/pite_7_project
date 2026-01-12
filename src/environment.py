@@ -160,7 +160,7 @@ class Environment:
         Agent.bound_y = self.pixel_height
         Agent.cell_size = self.cell_size
 
-        for _ in range(50):
+        for _ in range(500):
             pos_x = random.randint(0, Agent.bound_x)
             pos_y = random.randint(0, Agent.bound_y)
             agent = Agent((pos_x, pos_y), self)
@@ -257,13 +257,15 @@ class Environment:
                 agent.render(window, cell_size, (panel_x, panel_y))
 
             font = pygame.font.Font(None, 32)
-            tick_text = font.render(f"Ticks: {self.tick_counter}", True, (255, 255, 255))
+            tick_text = font.render(f"Ticks: {self.tick_counter}", True, (255, 0, 0))
             food_count_text = font.render(
-                f"Food items: {len(self.food_items)}", True, (255, 255, 255)
+                f"Food items: {len(self.food_items)}", True, (255, 0, 0)
             )
+            agent_text = font.render(f"Agents: {len(self.agents)}", True, (255, 0, 0))
 
             window.blit(tick_text, (panel_x + 10, panel_y + 10))
             window.blit(food_count_text, (panel_x + 10, panel_y + 90))
+            window.blit(agent_text, (panel_x + 10, panel_y + 170))
 
     def shutdown(self):
         self.running = False
@@ -281,8 +283,8 @@ class Environment:
 
     #This function should deal with creating new agents
     def create_agent(self, agent : Agent):
-        pass
-        # self.agents.append(agent)
+        self.agents.append(agent)
+
     def _get_agent_area(self, agent: Agent) -> Area:
         """Maps agent pixel position to the underlying terrain cell."""
         grid_x = min(self.grid_width - 1, max(0, int(agent.x // self.cell_size)))
