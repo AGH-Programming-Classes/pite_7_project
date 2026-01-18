@@ -7,6 +7,7 @@ from environment import Environment
 from area import Area
 from food import FoodSource
 from ui import UI
+import charts
 
 pygame.init()
 pygame.display.set_caption("Simulation")
@@ -14,6 +15,24 @@ screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
 
 clock = pygame.time.Clock()
 manager = pygame_gui.UIManager((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
+hint_font = pygame.font.Font(None, 22)
+
+
+def _format_first_sample_age() -> str:
+    age = charts.first_sample_age()
+    if age <= 0:
+        return ""
+    if age < 60:
+        return f"Oldest sample is {int(age)}s old"
+    minutes = int(age // 60)
+    seconds = int(age % 60)
+    return f"Oldest sample is {minutes}m {seconds}s old"
+
+
+def _chart_hint_text() -> str:
+    base = "Scroll over the chart area to pan charts"
+    age_text = _format_first_sample_age()
+    return f"{base} — {age_text}" if age_text else base
 env_ui = UI(
     manager=manager,
     x=config.PANEL_WIDTH + 2*config.PANEL_X,
@@ -27,6 +46,40 @@ env = Environment(
     grid_height=config.GRID_HEIGHT,
     pixel_width=config.PANEL_WIDTH,
     pixel_height=config.PANEL_HEIGHT
+)
+
+chart_rect = pygame.Rect(
+    config.PANEL_X,
+    config.PANEL_Y + config.PANEL_HEIGHT + 20,
+    config.PANEL_WIDTH,
+    config.CHART_AREA_HEIGHT
+)
+chart_hint_pos = (chart_rect.x, chart_rect.bottom + 4)
+
+charts.register_chart(
+    name="Agents over time",
+    value_name="Agents",
+    callback=env.agent_count,
+)
+charts.register_chart(
+    name="Average health",
+    value_name="HP",
+    callback=env.average_agent_health,
+)
+charts.register_chart(
+    name="Average energy",
+    value_name="Energy",
+    callback=env.average_agent_energy,
+)
+charts.register_chart(
+    name="Food sources with stock",
+    value_name="Sources",
+    callback=env.food_sources_with_stock,
+)
+charts.register_chart(
+    name="Stored food across sources",
+    value_name="Food",
+    callback=env.total_food_stock,
 )
 
 running = True
@@ -52,10 +105,14 @@ while running:
                         env.change_area_at(grid_x, grid_y, env_ui.current_brush)
                     elif isinstance(env_ui.current_brush, type(FoodSource)):
                         env.add_manual_food_source(grid_x, grid_y, env_ui.current_brush)
+        elif event.type == pygame.MOUSEWHEEL:
+            if chart_rect.collidepoint(mouse_pos):
+                charts.scroll(-event.y)
         manager.process_events(event)
         env_ui.process_events(event, env)
 
     manager.update(dt)
+    charts.update(dt)
 
     screen.fill((20, 20, 20)) # Clear screen
 
@@ -65,6 +122,10 @@ while running:
         panel_y=config.PANEL_Y,
         cell_size=config.CELL_SIZE
     )
+
+    charts.render(screen, chart_rect)
+    hint_surface = hint_font.render(_chart_hint_text(), True, (220, 220, 220))
+    screen.blit(hint_surface, chart_hint_pos)
 
     manager.draw_ui(screen)
 

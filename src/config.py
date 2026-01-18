@@ -17,6 +17,8 @@ CELL_SIZE = cfg["grid"]["cell_size"]
 GRID_WIDTH = PANEL_WIDTH // CELL_SIZE
 GRID_HEIGHT = PANEL_HEIGHT // CELL_SIZE
 
+CHART_AREA_HEIGHT = cfg["chart"]["height"]
+
 MIN_AGE_PERCENT = cfg["mating"]["min_age_percent"]
 MIN_ENERGY_LEVEL = cfg["mating"]["min_energy_level"]
 MAX_RANGE = cfg["mating"]["max_range"]
