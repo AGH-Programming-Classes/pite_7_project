@@ -1,11 +1,13 @@
 window:
   width: 1200
-  height: 800
+  height: 1000
 panel:
   width: 700
   height: 700
   x: 100
   y: 50
+chart:
+  height: 200
 grid:
   cell_size: 25
 mating:

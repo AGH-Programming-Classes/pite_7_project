@@ -285,6 +285,40 @@ class Environment:
     def create_agent(self, agent : Agent):
         self.agents.append(agent)
 
+    def agent_count(self) -> int:
+        with self.data_lock:
+            return sum(1 for agent in self.agents if agent.is_alive())
+
+    def average_agent_health(self) -> float:
+        with self.data_lock:
+            living = [agent for agent in self.agents if agent.is_alive()]
+            if not living:
+                return 0.0
+            return sum(agent.hp for agent in living) / len(living)
+
+    def average_agent_energy(self) -> float:
+        with self.data_lock:
+            living = [agent for agent in self.agents if agent.is_alive()]
+            if not living:
+                return 0.0
+            return sum(agent.energy for agent in living) / len(living)
+
+    def food_sources_with_stock(self) -> int:
+        with self.data_lock:
+            return sum(
+                1
+                for source in self.food_sources
+                if not source.is_destroyed and getattr(source, "food_left", 0) >= 1
+            )
+
+    def total_food_stock(self) -> float:
+        with self.data_lock:
+            return sum(
+                max(0.0, float(getattr(source, "food_left", 0)))
+                for source in self.food_sources
+                if not source.is_destroyed
+            )
+
     def _get_agent_area(self, agent: Agent) -> Area:
         """Maps agent pixel position to the underlying terrain cell."""
         grid_x = min(self.grid_width - 1, max(0, int(agent.x // self.cell_size)))
