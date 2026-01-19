@@ -5,6 +5,7 @@ import time
 import random
 from typing import List, Tuple
 import pygame
+from tomlkit import value
 from food import FoodSource, SimpleGrassPatch, Food, BerryBush, FertileFruitTree, CactusPads
 from agent import Agent
 from area import Area
@@ -23,6 +24,7 @@ class Environment:
         self.tick_counter = 0
         self.running = True
         self.pause_sim = False
+        self.sim_speed = 1.0
 
         self.grid_width = grid_width
         self.grid_height = grid_height
@@ -166,9 +168,12 @@ class Environment:
             agent = Agent((pos_x, pos_y), self)
             self.agents.append(agent)
 
+    def set_speed(self, value: float):
+        self.sim_speed = max(0.1, value)
+
     def _simulation_loop(self):
         while self.running:
-            time.sleep(0.01)
+            time.sleep(0.01 / self.sim_speed)
 
             if self.pause_sim:
                 continue

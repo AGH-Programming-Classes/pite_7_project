@@ -135,6 +135,29 @@ class UI:
             self.set_area_btns[btn] = area
             y_offset += margin + btn_height
            
+        # speed control ui section
+        self.speed_ctrl_container = pygame_gui.elements.UIAutoResizingContainer(
+            relative_rect=pygame.Rect(0, margin, self.panel.get_abs_rect().width - 2 * margin, 0),
+            manager=self.manager,
+            container=self.panel,
+            anchors={'top_target': self.area_ctrl_container}
+        )
+
+        self.speed_label = pygame_gui.elements.UILabel(
+            relative_rect=pygame.Rect(0, 0, -1, -1),
+            text='Sim Speed: 1.0x',
+            manager=self.manager,
+            container=self.speed_ctrl_container
+        )
+
+        self.speed_slider = pygame_gui.elements.UIHorizontalSlider(
+            relative_rect=pygame.Rect(0, 5, self.speed_ctrl_container.get_abs_rect().width, 20),
+            start_value=1.0,
+            value_range=(0.1, 10.0),
+            manager=self.manager,
+            container=self.speed_ctrl_container,
+            anchors={'top_target': self.speed_label}
+        )
 
         # sim control ui section
         self.sim_ctrl_container = pygame_gui.core.UIContainer(
@@ -217,6 +240,12 @@ class UI:
             elif event.ui_element in self.spawn_food_source_btns:
                 food_source = self.spawn_food_source_btns[event.ui_element]
                 self.change_brush(food_source, food_source.__name__)
+
+        elif event.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
+            if event.ui_element == self.speed_slider:
+                new_speed = event.value
+                env.set_speed(new_speed)
+                self.speed_label.set_text(f'Sim Speed: {new_speed:.1f}x')
 
     def change_brush(self, new_brush, brush_name: str):
         self.current_brush = new_brush
