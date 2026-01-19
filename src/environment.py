@@ -50,6 +50,9 @@ class Environment:
 
         self.data_lock = threading.Lock()
 
+        self._spatial_cell_size = 100.0
+        self._spatial_grid = {}
+
         self.simulation_thread = threading.Thread(target=self._simulation_loop)
         self.simulation_thread.start()
 
@@ -167,8 +170,37 @@ class Environment:
             agent = Agent((pos_x, pos_y), self)
             self.agents.append(agent)
 
+    def _build_spatial_grid(self):
+        """Build spatial hash grid for fast neighbor queries."""
+        self._spatial_grid.clear()
+        for agent in self.agents:
+            if agent.is_alive():
+                cell_x = int(agent.x // self._spatial_cell_size)
+                cell_y = int(agent.y // self._spatial_cell_size)
+                if (cell_x, cell_y) not in self._spatial_grid:
+                    self._spatial_grid[(cell_x, cell_y)] = []
+                self._spatial_grid[(cell_x, cell_y)].append(agent)
+
+    def get_nearby_agents(self, agent, radius: float) -> List[Agent]:
+        """Get agents within radius using spatial partitioning (O(1) instead of O(n))."""
+        cell_x = int(agent.x // self._spatial_cell_size)
+        cell_y = int(agent.y // self._spatial_cell_size)
+        
+        # Check how many cells we need to search based on radius
+        cells_to_check = int(radius // self._spatial_cell_size) + 1
+        
+        nearby = []
+        for dx in range(-cells_to_check, cells_to_check + 1):
+            for dy in range(-cells_to_check, cells_to_check + 1):
+                cell_key = (cell_x + dx, cell_y + dy)
+                if cell_key in self._spatial_grid:
+                    nearby.extend(self._spatial_grid[cell_key])
+        
+        return nearby
+
     def set_speed(self, value: float):
-        self.sim_speed = max(0.1, value)
+        with self.data_lock:
+            self.sim_speed = max(0.1, value)
 
     def _simulation_loop(self):
         while self.running:
@@ -219,6 +251,8 @@ class Environment:
                     if not food.update():
                         food_to_keep.append(food)
                 self.food_items = food_to_keep
+
+                self._build_spatial_grid()
 
                 new_agents = []
                 for agent in self.agents:
