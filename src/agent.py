@@ -127,7 +127,7 @@ class Agent:
         self.angle = random.random() * 360.0
         self.last_action = self.actions["ACTION_MOVE"]
 
-        #tracks recent motion; does not change the NN input/output interface.
+        #tracks recent motion, does not change the NN input/output interface.
         self._loop_positions = deque(maxlen=self.LOOP_WINDOW)
         self._loop_turns = deque(maxlen=self.LOOP_WINDOW)
         self._escape_steps_left = 0
@@ -262,7 +262,7 @@ class Agent:
                 food_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
                 food_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
                 self._last_food = best
-                if d <= self.sight: # Adding boolean to deal with semantic discontinuity ( 1 could mean food is far away and 0,95 mean is really close)
+                if d <= self.sight: # Adding boolean to deal with discontinuity ( 1 could mean food is far away and 0,95 mean is really close)
                     food_in_sight = 1
 
         friend_count_n = 0.0
@@ -453,7 +453,7 @@ class Agent:
         outputs = self.think(inputs)
         action, turn, intensity = self.decide(outputs)
 
-        # Anti-loop adjustment: breaks deterministic circles when turn stays nearly constant.
+        #breaks circles when turn stays nearly constant.
         action, turn, intensity = self._apply_anti_loop(action, turn, intensity)
         self.last_action = action
 
@@ -475,7 +475,7 @@ class Agent:
             self.logger.debug(f"Agent - {self.uuid}; action - attack")
             self._attack()
 
-        # Anti-loop tracking: record motion samples after the action was applied.
+        #to record motion samples after the action was applied.
         self._record_motion_sample(applied_turn=turn, did_move=did_move)
 
         self._tick_body()
