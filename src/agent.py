@@ -109,7 +109,7 @@ class Agent:
         self.max_energy = (10.0 + _sqrt_scale(self.body_points["energy"], 2.0)) * 2
         self.base_speed = 0.5 + _sqrt_scale(self.body_points["speed"], 0.2)
         self.attack_power = 0.5 + _sqrt_scale(self.body_points["attack"], 0.06)
-        self.max_age = int(200 + _sqrt_scale(self.body_points["lifespan"], 14.0)) * 2
+        self.max_age = int((300 + _sqrt_scale(self.body_points["lifespan"], 18.0)) * 2.5)
         self.sight = 70.0 + _sqrt_scale(self.body_points["sight"], 6.0)
         self.agility = 30.0 + _sqrt_scale(self.body_points["agility"], 2.0)
 
@@ -333,7 +333,7 @@ class Agent:
         new_y = self.y - math.sin(rad) * sp
         self._apply_bounds(new_x, new_y, new_angle)
 
-        cost = 0.02 + 0.06 * inten
+        cost = 0.01 + 0.05 * inten
         self.energy = max(0.0, self.energy - cost)
 
     def _idle(self):
@@ -372,7 +372,8 @@ class Agent:
             return
 
         if self._inputs_override is None:
-            inputs = self.sense(self.environment.food_sources, self.environment.get_agents())
+            nearby_agents = self.environment.get_nearby_agents(self, self.sight * 2)
+            inputs = self.sense(self.environment.food_sources, nearby_agents)
         else:
             inputs = self._inputs_override
 

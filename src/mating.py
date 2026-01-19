@@ -64,9 +64,22 @@ class Mating:
     
     def create_new_decision_matrix(self, second : Agent):
         output = []
+        crossover_points = [randint(1, len(self.parent.weights[0])-1) for _ in range(2)]
+        crossover_points.sort()
+        
         for i in range(len(self.parent.weights)):
-            number = randint(0, len(self.parent.weights[0]))
-            output.append(self.parent.weights[i][:number] + second.weights[i][number:])
+            row = []
+            last_point = 0
+            parent = self.parent
+            
+            for cp in crossover_points:
+                row.extend(parent.weights[i][last_point:cp])
+                parent = second if parent == self.parent else self.parent
+                last_point = cp
+            
+            row.extend(parent.weights[i][last_point:])
+            output.append(row)
+        
         return output
 
     def create_new_genome_vector(self, second : Agent):
