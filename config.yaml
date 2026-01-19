@@ -1,19 +1,19 @@
 window:
   width: 1200
-  height: 1000
+  height: 900
 panel:
   width: 700
   height: 700
   x: 100
   y: 50
 chart:
-  height: 200
+  height: 100
 grid:
   cell_size: 25
 mating:
-  min_age_percent: 0.2
-  min_energy_level: 0.75
-  max_range: 5
-  mutation_chance: 0.05
-  mutation_multiply_border: 0.2 
+  min_age_percent: 0.10
+  min_energy_level: 0.50
+  max_range: 10
+  mutation_chance: 0.08
+  mutation_multiply_border: 0.25 
   mutation_addding_border: 0.05

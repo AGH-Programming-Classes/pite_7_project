@@ -6,16 +6,16 @@ class Area(Enum):
             "display_name": "Plains", 
             "agent_speed_modifier": 1.0,
             "food_regen_modifier": 1.2, 
-            "expansion_chance": 0.003, 
+            "expansion_chance": 0.010, 
             "color": (60, 120, 60), 
-            "max_food_sources": 5}
+            "max_food_sources": 8}
     FERTILE_VALLEY = {"id": 2,
                     "display_name": "Fertile Valley", 
                     "agent_speed_modifier": 0.9,
                     "food_regen_modifier": 1.5, 
-                    "expansion_chance": 0.001, 
+                    "expansion_chance": 0.007, 
                     "color": (80, 160, 80), 
-                    "max_food_sources": 5}
+                    "max_food_sources": 7}
     DESERT = {"id": 3,
               "display_name": 
               "Desert", 
@@ -28,7 +28,7 @@ class Area(Enum):
                     "display_name": "Berry Corner", 
                     "agent_speed_modifier": 1.0,
                     "food_regen_modifier": 1.2, 
-                    "expansion_chance": 0.007, 
+                    "expansion_chance": 0.012, 
                     "color": (180, 100, 255), 
                     "max_food_sources": 5}
 

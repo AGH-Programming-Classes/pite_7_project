@@ -1,7 +1,6 @@
 """Main application entry point for the simulation."""
 import pygame
 import pygame_gui
-from pygame_gui.elements import UIButton, UIPanel
 import config
 from environment import Environment
 from area import Area
