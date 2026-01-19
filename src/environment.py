@@ -216,11 +216,15 @@ class Environment:
                         food_to_keep.append(food)
                 self.food_items = food_to_keep
 
+                new_agents = []
                 for agent in self.agents:
                     area = self._get_agent_area(agent)
                     speed_modifier = getattr(area, "agent_speed_modifier", 1.0)
                     agent.update(speed_modifier)
-                    self._feed_agent(agent)
+                    if ( agent.is_alive()):
+                        self._feed_agent(agent)
+                        new_agents.append(agent)
+                self.agents = new_agents
 
 
     def set_grid_cell(self, x: int, y: int, value: int):
