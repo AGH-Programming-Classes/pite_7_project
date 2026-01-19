@@ -29,13 +29,25 @@ def _sqrt_scale(points: float, k: float) -> float:
     """Scales points using square root with coefficient k."""
     return k * math.sqrt(max(0.0, points))
 
+def _sign(x: float):
+    """Returns sign of value x."""
+    return 1.0 if x >= 0 else -1.0
 
 def dist2(ax: float, ay: float, bx: float, by: float) -> float:
-    """Returns squared Euclidean dist2ance between (ax, ay) and (bx, by)."""
-    dx = ax - bx
-    dy = ay - by
+    """Returns squared distance between (ax, ay) and (bx, by) in torus space."""
+    dx, dy = torus_diff(ax, ay, bx, by)
     return dx * dx + dy * dy
 
+def torus_diff(ax: float, ay: float, bx: float, by: float) -> typing.Tuple[float, float]:
+    """Returns dirrection (dx, dy) from (ax, ay) to (bx, by) in torus space."""
+    max_x = float(Agent.bound_x)
+    max_y = float(Agent.bound_y)
+    tx = float(bx - ax)
+    ty = float(by - ay)
+    dx = tx if abs(tx) < max_x / 2 else tx - _sign(tx) * max_x 
+    dy = ty if abs(ty) < max_y / 2 else ty - _sign(ty) * max_y
+    return (dx, dy)
+     
 
 class Agent:
     """Represents an agent in the simulation with neural network-based decision making."""
@@ -168,8 +180,7 @@ class Agent:
                     best_d2 = d2
                     best = (fx, fy)
             if best is not None:
-                dx = best[0] - self.x
-                dy = best[1] - self.y
+                dx, dy = torus_diff(self.x, self.y, best[0], best[1])
                 d = math.sqrt(best_d2)
                 food_d_n = _clamp(d / max(1e-9, self.sight), 0.0, 1.0)
                 food_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
@@ -217,8 +228,7 @@ class Agent:
             enemy_count_n = _clamp(enemies / 10.0, 0.0, 1.0)
 
             if best_enemy is not None:
-                dx = best_enemy[0] - self.x
-                dy = best_enemy[1] - self.y
+                dx, dy = torus_diff(self.x, self.y, best_enemy[0], best_enemy[1])
                 d = math.sqrt(best_enemy_d2)
                 enemy_d_n = _clamp(d / max(1e-9, self.sight), 0.0, 1.0)
                 enemy_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
@@ -229,8 +239,7 @@ class Agent:
 
             
             if best_friend is not None: # Adding this part to enable to agent getting information where are friends
-                dx = best_friend[0] - self.x
-                dy = best_friend[1] - self.y
+                dx, dy = torus_diff(self.x, self.y, best_friend[0], best_friend[1])
                 d = math.sqrt(best_friend_d2)
                 friend_d_n = _clamp(d / max(1e-9, self.sight), 0.0, 1.0)
                 friend_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
@@ -290,7 +299,7 @@ class Agent:
         return best_i, turn, intensity
 
     def _apply_bounds(self, new_x: float, new_y: float, new_angle: float):
-        """Apply world boundary conditions with reflection."""
+        """Apply torus effect (link right to left and top to bottom)."""
         bx = float(self.bound_x)
         by = float(self.bound_y)
         if bx <= 0 or by <= 0:
@@ -300,16 +309,8 @@ class Agent:
         max_x = max(0.0, bx - 1e-6)
         max_y = max(0.0, by - 1e-6)
 
-        if new_x < 0.0 or new_x >= bx:
-            new_x = -new_x if new_x < 0.0 else (2.0 * max_x - new_x)
-            new_angle = 180.0 - new_angle
-
-        if new_y < 0.0 or new_y >= by:
-            new_y = -new_y if new_y < 0.0 else (2.0 * max_y - new_y)
-            new_angle = 360.0 - new_angle
-
-        self.x = max(0.0, min(new_x, max_x))
-        self.y = max(0.0, min(new_y, max_y))
+        self.x = (new_x + bx) % max_x
+        self.y = (new_y + by) % max_y
         self.angle = new_angle % 360.0
 
     def _move(self, turn: float, intensity: float, speed_modifier: float = 1.0):
@@ -335,8 +336,7 @@ class Agent:
             self._move(turn, intensity)
             return
         ex, ey = self._last_enemy
-        dx = self.x - float(ex)
-        dy = self.y - float(ey)
+        dx, dy = torus_diff(ex, ey, self.x, self.y)
         ang = math.degrees(math.atan2(-dy, dx))
         self.angle = ang % 360.0
         self._move(0.0, max(0.2, intensity))
