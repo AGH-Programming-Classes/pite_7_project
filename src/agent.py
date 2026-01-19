@@ -9,6 +9,7 @@ import logging
 if typing.TYPE_CHECKING:
     from environment import Environment
 import uuid
+from area import Area
 
 
 def _clamp(x: float, lo: float, hi: float) -> float:
@@ -51,12 +52,14 @@ class Agent:
     # 7  food_d_n        -> dist2ance to nearest food normalized by sight (0..1)
     # 8  food_dx_n       -> x direction to nearest food (normalized)
     # 9  food_dy_n       -> y direction to nearest food (normalized)
-    # 10 friend_count_n  -> nearby friends count (normalized)
+    # 10 food_in_sight   -> whether food is within sight range (0 or 1)
+    # 11 friend_count_n  -> nearby friends count (normalized)
     # 11 enemy_count_n   -> nearby enemies count (normalized)
     # 12 enemy_d_n       -> dist2ance to nearest enemy normalized by sight (0..1)
     # 13 enemy_dx_n      -> x direction to nearest enemy (normalized)
     # 14 enemy_dy_n      -> y direction to nearest enemy (normalized)
-    # 15 bias            -> constant bias input (always 1.0)
+    # 15 ground          -> type of ground where agent actually is
+    # 16 bias            -> constant bias input (always 1.0)
     bound_x = 0
     bound_y = 0
     cell_size = 1
@@ -73,7 +76,7 @@ class Agent:
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
 
-    def __init__(self, position: tuple, environment : Environment,/, decision_matrix : typing.List[typing.List[int]] = None, genome = None ):
+    def __init__(self, position: tuple, environment : Environment,/, decision_matrix : typing.List[typing.List[int]] = None, genome = None, species = None ):
         from mating import Mating
 
         self.environment = environment
@@ -83,7 +86,7 @@ class Agent:
 
         self.uuid = uuid.uuid4()
 
-        self.group_id = random.randint(0, 1)  # team/species id (same -> friend, different -> enemy)
+        self.group_id = species if species else random.randint(0,1)  # team/species id (same -> friend, different -> enemy)
 
         if genome:
             self.body_points = genome
@@ -91,10 +94,10 @@ class Agent:
             self.body_points = self._random_body_points(self.body_points_total)
 
         self.max_hp = 10.0 + _sqrt_scale(self.body_points["hp"], 2.0)
-        self.max_energy = (10.0 + _sqrt_scale(self.body_points["energy"], 2.0)) * 5
+        self.max_energy = (10.0 + _sqrt_scale(self.body_points["energy"], 2.0)) * 2
         self.base_speed = 0.5 + _sqrt_scale(self.body_points["speed"], 0.2)
         self.attack_power = 0.5 + _sqrt_scale(self.body_points["attack"], 0.06)
-        self.max_age = int(200 + _sqrt_scale(self.body_points["lifespan"], 14.0)) * 5
+        self.max_age = int(200 + _sqrt_scale(self.body_points["lifespan"], 14.0)) * 2
         self.sight = 70.0 + _sqrt_scale(self.body_points["sight"], 6.0)
         self.agility = 30.0 + _sqrt_scale(self.body_points["agility"], 2.0)
 
@@ -156,7 +159,7 @@ class Agent:
         head_x = math.cos(ang)  # facing direction (unit vector)
         head_y = -math.sin(ang)
 
-        food_d_n, food_dx_n, food_dy_n, food_in_sigth = 1.0, 0.0, 0.0, 0
+        food_d_n, food_dx_n, food_dy_n, food_in_sight = 1.0, 0.0, 0.0, 0
         if foods:
             best_d2 = 1e18
             best = None
@@ -176,7 +179,7 @@ class Agent:
                 food_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
                 self._last_food = best
                 if d <= self.sight: # Adding boolean to deal with semantic discontinuity ( 1 could mean food is far away and 0,95 mean is really close)
-                    food_in_sigth = 1
+                    food_in_sight = 1
 
         friend_count_n = 0.0
         friend_d_n, friend_dx_n, friend_dy_n = 1.0, 0.0, 0.0
@@ -239,8 +242,12 @@ class Agent:
             else:
                 self._last_friend = None
 
-            
-
+        cell = self.environment._get_agent_area(self)
+        if cell == Area.PLAINS: ground = 0
+        elif cell == Area.FERTILE_VALLEY: ground = 0.9
+        elif cell == Area.DESERT: ground = 0.1
+        elif cell == Area.BERRY_CORNER: ground= 1
+        else: raise ValueError(f"Wrong place! {cell}, {type(cell)}")
 
         return [
             hp_n,
@@ -253,7 +260,7 @@ class Agent:
             food_d_n,
             food_dx_n,
             food_dy_n,
-            food_in_sigth,
+            food_in_sight,
             friend_count_n,
             friend_d_n,
             friend_dx_n,
@@ -262,7 +269,8 @@ class Agent:
             enemy_d_n,
             enemy_dx_n,
             enemy_dy_n,
-            1.0,
+            ground,
+            1.0
         ]
 
     def think(self, inputs):
@@ -357,14 +365,14 @@ class Agent:
             self.hp = 0.0
 
     def is_alive(self) -> bool:
-        return self.hp > 0.0
+        return self.hp > 0.0 and self.energy > 0
 
     def update(self, speed_modifier):
         if not self.is_alive():
             return
 
         if self._inputs_override is None:
-            inputs = self.sense()
+            inputs = self.sense(self.environment.food_sources, self.environment.get_agents())
         else:
             inputs = self._inputs_override
 
@@ -410,7 +418,8 @@ class Agent:
         rad = math.radians(self.angle - 135.0)
         points.append((env_x + math.cos(rad) * r, env_y - math.sin(rad) * r))
 
-        pygame.draw.polygon(window, (255, 255, 255), points)
+        color = (100, 200, 255) if self.group_id == 0 else (255, 255, 255)  
+        pygame.draw.polygon(window, color, points)
 
         bar_w = int(cell_size * 0.8)
         bar_h = max(2, int(cell_size * 0.12))

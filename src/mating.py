@@ -13,7 +13,7 @@ class Mating:
             return
         close_agents = self._get_nearby_agents()
         matrix, vector = self.get_new_genome(choice(close_agents))
-        new_agent = Agent((self.parent.x, self.parent.y), self.parent.environment, decision_matrix= matrix, genome= vector)
+        new_agent = Agent((self.parent.x, self.parent.y), self.parent.environment, decision_matrix= matrix, genome= vector, species = self.parent.group_id)
         energy_level = self.parent.energy / self.parent.max_energy
         new_agent.energy = new_agent.max_energy * energy_level / 2
         self.parent.energy /= 2
@@ -23,7 +23,7 @@ class Mating:
     def _get_nearby_agents(self):
         close_agents: typing.List[Agent] = []
         for agent in self.parent.environment.get_agents():
-            if dist2(self.parent.x, self.parent.y, agent.x, agent.y) < config.MAX_RANGE:
+            if dist2(self.parent.x, self.parent.y, agent.x, agent.y) < config.MAX_RANGE and agent.group_id == self.parent.group_id:
                 close_agents.append(agent)
         return close_agents
 
