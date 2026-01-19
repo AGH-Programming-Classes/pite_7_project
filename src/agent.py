@@ -1,15 +1,20 @@
 """Agent module containing the Agent class and related utilities for simulation."""
 from __future__ import annotations
-from food import FoodSource
+
+import logging
 import math
 import random
-import pygame
 import typing
-import logging
+import uuid
+from collections import deque
+
+import pygame
+
+from area import Area
+from food import FoodSource
+
 if typing.TYPE_CHECKING:
     from environment import Environment
-import uuid
-from area import Area
 
 
 def _clamp(x: float, lo: float, hi: float) -> float:
@@ -30,75 +35,101 @@ def _sqrt_scale(points: float, k: float) -> float:
     """Scales points using square root with coefficient k."""
     return k * math.sqrt(max(0.0, points))
 
-def _sign(x: float):
+
+def _sign(x: float) -> float:
     """Returns sign of value x."""
     return 1.0 if x >= 0 else -1.0
+
 
 def dist2(ax: float, ay: float, bx: float, by: float) -> float:
     """Returns squared distance between (ax, ay) and (bx, by) in torus space."""
     dx, dy = torus_diff(ax, ay, bx, by)
     return dx * dx + dy * dy
 
+
 def torus_diff(ax: float, ay: float, bx: float, by: float) -> typing.Tuple[float, float]:
-    """Returns dirrection (dx, dy) from (ax, ay) to (bx, by) in torus space."""
+    """Returns direction (dx, dy) from (ax, ay) to (bx, by) in torus space."""
     max_x = float(Agent.bound_x)
     max_y = float(Agent.bound_y)
     tx = float(bx - ax)
     ty = float(by - ay)
-    dx = tx if abs(tx) < max_x / 2 else tx - _sign(tx) * max_x 
+    dx = tx if abs(tx) < max_x / 2 else tx - _sign(tx) * max_x
     dy = ty if abs(ty) < max_y / 2 else ty - _sign(ty) * max_y
     return (dx, dy)
-     
+
 
 class Agent:
     """Represents an agent in the simulation with neural network-based decision making."""
 
     # Sense vector (normalized inputs for neural network):
-    # 0  hp_n            -> current HP / max HP (0..1)
-    # 1  en_n            -> current energy / max energy (0..1)
-    # 2  age_n           -> current age / max age (0..1)
-    # 3  x_n             -> x position normalized to world width (0..1)
-    # 4  y_n             -> y position normalized to world height (0..1)
-    # 5  head_x          -> facing direction x (cos(angle))
-    # 6  head_y          -> facing direction y (-sin(angle))
-    # 7  food_d_n        -> dist2ance to nearest food normalized by sight (0..1)
-    # 8  food_dx_n       -> x direction to nearest food (normalized)
-    # 9  food_dy_n       -> y direction to nearest food (normalized)
-    # 10 food_in_sight   -> whether food is within sight range (0 or 1)
-    # 11 friend_count_n  -> nearby friends count (normalized)
-    # 11 enemy_count_n   -> nearby enemies count (normalized)
-    # 12 enemy_d_n       -> dist2ance to nearest enemy normalized by sight (0..1)
-    # 13 enemy_dx_n      -> x direction to nearest enemy (normalized)
-    # 14 enemy_dy_n      -> y direction to nearest enemy (normalized)
-    # 15 ground          -> type of ground where agent actually is
-    # 16 bias            -> constant bias input (always 1.0)
+    # 0  hp_n
+    # 1  en_n
+    # 2  age_n
+    # 3  x_n
+    # 4  y_n
+    # 5  head_x
+    # 6  head_y
+    # 7  food_d_n
+    # 8  food_dx_n
+    # 9  food_dy_n
+    # 10 food_in_sight (0/1)  <-- kluczowa flaga od kolegi
+    # 11 friend_count_n
+    # 12 friend_d_n
+    # 13 friend_dx_n
+    # 14 friend_dy_n
+    # 15 friend_in_sight (0/1)  <-- dodane analogicznie
+    # 16 enemy_count_n
+    # 17 enemy_d_n
+    # 18 enemy_dx_n
+    # 19 enemy_dy_n
+    # 20 enemy_in_sight (0/1)   <-- dodane analogicznie
+    # 21 ground
+    # 22 loop_n (0..1)          <-- detekcja kręcenia kółek (pomocniczy sygnał)
+    # 23 bias (1.0)
+
     bound_x = 0
     bound_y = 0
     cell_size = 1
 
-
-    actions = {"ACTION_MOVE" : 0,
-    "ACTION_IDLE" : 1,
-    "ACTION_FLEE" : 2,
-    "ACTION_MATE" : 3,
-    "ACTION_ATTACK" : 4}
+    actions = {
+        "ACTION_MOVE": 0,
+        "ACTION_IDLE": 1,
+        "ACTION_FLEE": 2,
+        "ACTION_MATE": 3,
+        "ACTION_ATTACK": 4,
+    }
 
     body_points_total = 100
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
 
-    def __init__(self, position: tuple, environment : Environment,/, decision_matrix : typing.List[typing.List[int]] = None, genome = None, species = None ):
+    # --- anti-loop / drift tuning ---
+    _HISTORY_LEN = 40               # ile ostatnich pozycji trzymamy
+    _MIN_PROGRESS_PX = 12.0         # poniżej tej "drogi netto" uznajemy, że jest pętla/stagnacja
+    _LOOP_CONFIRM_STEPS = 25        # ile klatek musi to trwać, żeby uznać pętlę
+    _DRIFT_MAX_DEG = 20.0           # maksymalny dryf w stopniach (nie robi chaosu)
+    _DRIFT_STEP_DEG = 2.0           # jak szybko dryf się zmienia
+    _DRIFT_DECAY = 0.85             # jak szybko dryf zanika, gdy nie ma problemu
+
+    def __init__(
+        self,
+        position: tuple,
+        environment: "Environment",
+        /,
+        decision_matrix: typing.List[typing.List[float]] | None = None,
+        genome=None,
+        species=None,
+    ):
         from mating import Mating
 
         self.environment = environment
-        self.mate_module :Mating = Mating(self)
+        self.mate_module: Mating = Mating(self)
         self.x = float(position[0])
         self.y = float(position[1])
 
         self.uuid = uuid.uuid4()
-
-        self.group_id = species if species else random.randint(0,1)  # team/species id (same -> friend, different -> enemy)
+        self.group_id = species if species is not None else random.randint(0, 1)
 
         if genome:
             self.body_points = genome
@@ -120,22 +151,51 @@ class Agent:
         self.angle = random.random() * 360.0
         self.last_action = self.actions["ACTION_MOVE"]
 
+        # --- memory for anti-loop ---
+        self._pos_history: deque[tuple[float, float]] = deque(maxlen=self._HISTORY_LEN)
+        self._loop_counter = 0
+        self._drift_deg = 0.0
+
+        self._inputs_override = None
+        self._last_enemy = None
+        self._last_food = None
+        self._last_friend = None
+
+        # infer input size from sense vector
         self.input_size = len(self.sense())
         self.action_count = len(self.actions)
         self.output_size = self.action_count + 2
 
         if decision_matrix:
-            self.weights = decision_matrix
+            self.weights = self._normalize_or_rebuild_weights(decision_matrix)
         else:
             self.weights = self._random_matrix(self.input_size, self.output_size, scale=0.6)
 
+    def _normalize_or_rebuild_weights(self, decision_matrix: typing.List[typing.List[float]]):
+        """
+        Backward compatibility: if someone passes a matrix with wrong shape,
+        we rebuild it to the correct input_size/output_size.
+        """
+        try:
+            rows = len(decision_matrix)
+            cols = len(decision_matrix[0]) if rows else 0
+        except Exception:
+            rows, cols = 0, 0
 
-        self._inputs_override = None
-        self._last_enemy = None
-        self._last_food = None
+        if rows == self.input_size and cols == self.output_size:
+            return decision_matrix
+
+        # Rebuild to avoid runtime IndexError in think()
+        rebuilt = self._random_matrix(self.input_size, self.output_size, scale=0.6)
+        min_r = min(rows, self.input_size)
+        min_c = min(cols, self.output_size)
+        for i in range(min_r):
+            for j in range(min_c):
+                rebuilt[i][j] = float(decision_matrix[i][j])
+        return rebuilt
 
     def _random_body_points(self, total: int):
-        """Randomly dist2ribute total points across body stat keys."""
+        """Randomly distribute total points across body stat keys."""
         keys = ["hp", "energy", "speed", "attack", "lifespan", "sight", "agility"]
         pts = {k: 0 for k in keys}
         for _ in range(total):
@@ -155,6 +215,33 @@ class Agent:
             raise ValueError(f"expected input vector length {self.input_size}, got {len(inputs)}")
         self._inputs_override = [float(v) for v in inputs]
 
+    def _net_progress(self) -> float:
+        """Net displacement over history window."""
+        if len(self._pos_history) < 2:
+            return 1e9
+        x0, y0 = self._pos_history[0]
+        x1, y1 = self._pos_history[-1]
+        dx, dy = torus_diff(x0, y0, x1, y1)
+        return math.sqrt(dx * dx + dy * dy)
+
+    def _update_loop_state(self, has_target_in_sight: bool) -> float:
+        """
+        Returns loop_n in [0..1]. Increases when agent doesn't make progress and has no target.
+        """
+        self._pos_history.append((self.x, self.y))
+
+        if has_target_in_sight:
+            self._loop_counter = max(0, self._loop_counter - 2)
+            return _clamp(self._loop_counter / float(self._LOOP_CONFIRM_STEPS), 0.0, 1.0)
+
+        progress = self._net_progress()
+        if progress < self._MIN_PROGRESS_PX and len(self._pos_history) >= self._LOOP_CONFIRM_STEPS:
+            self._loop_counter = min(self._LOOP_CONFIRM_STEPS, self._loop_counter + 1)
+        else:
+            self._loop_counter = max(0, self._loop_counter - 1)
+
+        return _clamp(self._loop_counter / float(self._LOOP_CONFIRM_STEPS), 0.0, 1.0)
+
     def sense(self, foods=None, agents=None):
         """Generate normalized sensory input vector."""
         bx = float(self.bound_x) if self.bound_x > 0 else 1.0
@@ -164,13 +251,14 @@ class Agent:
         en_n = _clamp(self.energy / max(1e-9, self.max_energy), 0.0, 1.0)
         age_n = _clamp(self.age / max(1, self.max_age), 0.0, 1.0)
 
-        x_n = _clamp(self.x / max(1e-9, bx), 0.0, 1.0)  # normalized position
+        x_n = _clamp(self.x / max(1e-9, bx), 0.0, 1.0)
         y_n = _clamp(self.y / max(1e-9, by), 0.0, 1.0)
 
         ang = math.radians(self.angle)
-        head_x = math.cos(ang)  # facing direction (unit vector)
+        head_x = math.cos(ang)
         head_y = -math.sin(ang)
 
+        # --- food ---
         food_d_n, food_dx_n, food_dy_n, food_in_sight = 1.0, 0.0, 0.0, 0
         if foods:
             best_d2 = 1e18
@@ -185,24 +273,27 @@ class Agent:
             if best is not None:
                 dx, dy = torus_diff(self.x, self.y, best[0], best[1])
                 d = math.sqrt(best_d2)
+
+                # Normalizacja dystansu: nadal clamp 0..1, ale boolean mówi "czy w zasięgu"
                 food_d_n = _clamp(d / max(1e-9, self.sight), 0.0, 1.0)
                 food_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
                 food_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
                 self._last_food = best
-                if d <= self.sight: # Adding boolean to deal with semantic discontinuity ( 1 could mean food is far away and 0,95 mean is really close)
+                if d <= self.sight:
                     food_in_sight = 1
 
+        # --- friends / enemies ---
         friend_count_n = 0.0
-        friend_d_n, friend_dx_n, friend_dy_n = 1.0, 0.0, 0.0
+        friend_d_n, friend_dx_n, friend_dy_n, friend_in_sight = 1.0, 0.0, 0.0, 0
         enemy_count_n = 0.0
-        enemy_d_n, enemy_dx_n, enemy_dy_n = 1.0, 0.0, 0.0
+        enemy_d_n, enemy_dx_n, enemy_dy_n, enemy_in_sight = 1.0, 0.0, 0.0, 0
 
         if agents:
             r2 = self.sight * self.sight
             friends = 0
             enemies = 0
             best_friend_d2 = 1e18
-            best_friend = None 
+            best_friend = None
             best_enemy_d2 = 1e18
             best_enemy = None
 
@@ -237,26 +328,38 @@ class Agent:
                 enemy_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
                 enemy_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
                 self._last_enemy = best_enemy
+                if d <= self.sight:
+                    enemy_in_sight = 1
             else:
                 self._last_enemy = None
 
-            
-            if best_friend is not None: # Adding this part to enable to agent getting information where are friends
+            if best_friend is not None:
                 dx, dy = torus_diff(self.x, self.y, best_friend[0], best_friend[1])
                 d = math.sqrt(best_friend_d2)
                 friend_d_n = _clamp(d / max(1e-9, self.sight), 0.0, 1.0)
                 friend_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
                 friend_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
                 self._last_friend = best_friend
+                if d <= self.sight:
+                    friend_in_sight = 1
             else:
                 self._last_friend = None
 
         cell = self.environment._get_agent_area(self)
-        if cell == Area.PLAINS: ground = 0
-        elif cell == Area.FERTILE_VALLEY: ground = 0.9
-        elif cell == Area.DESERT: ground = 0.1
-        elif cell == Area.BERRY_CORNER: ground= 1
-        else: raise ValueError(f"Wrong place! {cell}, {type(cell)}")
+        if cell == Area.PLAINS:
+            ground = 0.0
+        elif cell == Area.FERTILE_VALLEY:
+            ground = 0.9
+        elif cell == Area.DESERT:
+            ground = 0.1
+        elif cell == Area.BERRY_CORNER:
+            ground = 1.0
+        else:
+            raise ValueError(f"Wrong place! {cell}, {type(cell)}")
+
+        # loop detector: tylko jeśli nie ma celu w zasięgu
+        has_target_in_sight = bool(food_in_sight or enemy_in_sight or friend_in_sight)
+        loop_n = self._update_loop_state(has_target_in_sight=has_target_in_sight)
 
         return [
             hp_n,
@@ -269,17 +372,20 @@ class Agent:
             food_d_n,
             food_dx_n,
             food_dy_n,
-            food_in_sight,
+            float(food_in_sight),
             friend_count_n,
             friend_d_n,
             friend_dx_n,
             friend_dy_n,
+            float(friend_in_sight),
             enemy_count_n,
             enemy_d_n,
             enemy_dx_n,
             enemy_dy_n,
+            float(enemy_in_sight),
             ground,
-            1.0
+            loop_n,
+            1.0,
         ]
 
     def think(self, inputs):
@@ -321,9 +427,27 @@ class Agent:
         self.y = (new_y + by) % max_y
         self.angle = new_angle % 360.0
 
-    def _move(self, turn: float, intensity: float, speed_modifier: float = 1.0):
+    def _update_drift(self, loop_n: float):
+        """
+        Lekki dryf: gdy loop_n rośnie, dryf rośnie (mała losowa korekta kierunku),
+        gdy loop_n maleje, dryf zanika.
+        """
+        if loop_n > 0.5:
+            # random-walk drift
+            step = random.uniform(-self._DRIFT_STEP_DEG, self._DRIFT_STEP_DEG)
+            self._drift_deg = _clamp(self._drift_deg + step, -self._DRIFT_MAX_DEG, self._DRIFT_MAX_DEG)
+        else:
+            # decay to 0
+            self._drift_deg *= self._DRIFT_DECAY
+            if abs(self._drift_deg) < 0.05:
+                self._drift_deg = 0.0
+
+    def _move(self, turn: float, intensity: float, speed_modifier: float = 1.0, loop_n: float = 0.0):
+        # turn from network + drift if looping
+        self._update_drift(loop_n)
+
         turn_delta = turn * (self.agility * 0.5)
-        new_angle = self.angle + turn_delta
+        new_angle = self.angle + turn_delta + self._drift_deg * loop_n
 
         inten = _clamp(0.5 + 0.5 * intensity, 0.0, 1.0)
         sp = self.base_speed * (0.20 + 1.30 * inten) * speed_modifier
@@ -355,7 +479,6 @@ class Agent:
     def _mate(self):
         self.mate_module.mate()
 
-
     def _tick_body(self):
         self.age += 1
         self.energy = max(0.0, self.energy - 0.01)
@@ -380,14 +503,17 @@ class Agent:
         action, turn, intensity = self.decide(outputs)
         self.last_action = action
 
+        # loop_n jest na przedostatniej pozycji (przed bias)
+        loop_n = float(inputs[-2])
+
         if action == self.actions["ACTION_MOVE"]:
             self.logger.debug(f"Agent - {self.uuid}; action - move")
-            self._move(turn, intensity)
+            self._move(turn, intensity, speed_modifier=speed_modifier, loop_n=loop_n)
         elif action == self.actions["ACTION_IDLE"]:
             self.logger.debug(f"Agent - {self.uuid}; action - idle")
             self._idle()
         elif action == self.actions["ACTION_FLEE"]:
-            self.logger.debug(f"Agent - {self.uuid}; action - free")
+            self.logger.debug(f"Agent - {self.uuid}; action - flee")
             self._flee(turn, intensity)
         elif action == self.actions["ACTION_MATE"]:
             self.logger.debug(f"Agent - {self.uuid}; action - mate")
@@ -418,7 +544,7 @@ class Agent:
         rad = math.radians(self.angle - 135.0)
         points.append((env_x + math.cos(rad) * r, env_y - math.sin(rad) * r))
 
-        color = (100, 200, 255) if self.group_id == 0 else (255, 255, 255)  
+        color = (100, 200, 255) if self.group_id == 0 else (255, 255, 255)
         pygame.draw.polygon(window, color, points)
 
         bar_w = int(cell_size * 0.8)
