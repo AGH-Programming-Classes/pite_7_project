@@ -208,13 +208,12 @@ class UI:
             elif event.ui_element == self.sim_pause_btn:
                 env.pause()
             elif event.ui_element == self.sim_reset_btn:
-                # TODO reset simulation
-                pass
+                env.reset()
             elif event.ui_element == self.spawn_agent_btn:
                 self.change_brush(Agent, 'Agent')
             elif event.ui_element in self.set_area_btns:
-               area = self.set_area_btns[event.ui_element]
-               self.change_brush(area, area.display_name)
+                area = self.set_area_btns[event.ui_element]
+                self.change_brush(area, area.display_name)
             elif event.ui_element in self.spawn_food_source_btns:
                 food_source = self.spawn_food_source_btns[event.ui_element]
                 self.change_brush(food_source, food_source.__name__)

@@ -8,6 +8,7 @@ from area import Area
 from food import FoodSource
 from ui import UI
 import charts
+from agent import Agent
 
 pygame.init()
 pygame.display.set_caption("Simulation")
@@ -98,13 +99,18 @@ while running:
                                     config.PANEL_WIDTH,
                                     config.PANEL_HEIGHT)
             if sim_rect.collidepoint(mouse_pos):
-                grid_x = (mouse_pos[0] - config.PANEL_X) // config.CELL_SIZE
-                grid_y = (mouse_pos[1] - config.PANEL_Y) // config.CELL_SIZE
+                pixel_x = (mouse_pos[0] - config.PANEL_X)
+                pixel_y = (mouse_pos[1] - config.PANEL_Y)
+                grid_x = pixel_x // config.CELL_SIZE
+                grid_y = pixel_y // config.CELL_SIZE
                 if env_ui.current_brush:
                     if isinstance(env_ui.current_brush, Area):
                         env.change_area_at(grid_x, grid_y, env_ui.current_brush)
                     elif isinstance(env_ui.current_brush, type(FoodSource)):
                         env.add_manual_food_source(grid_x, grid_y, env_ui.current_brush)
+                    elif isinstance(env_ui.current_brush, type(Agent)):
+                        agent = Agent((pixel_x, pixel_y), env)
+                        env.create_agent(agent)
         elif event.type == pygame.MOUSEWHEEL:
             if chart_rect.collidepoint(mouse_pos):
                 charts.scroll(-event.y)
