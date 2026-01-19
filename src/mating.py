@@ -5,13 +5,18 @@ import config
 from random import choice, randint, random, uniform
 
 class Mating:
+    """Handles reproduction logic for agents including mate selection and genome crossover."""
+    
     def __init__(self, parent: Agent):
         self.parent : Agent = parent
 
     def mate(self):
+        """Attempt mating if constraints are met. Creates offspring with blended genetics."""
         if not self._checking_constrains():
             return
         close_agents = self._get_nearby_agents()
+        if not close_agents:
+            return
         matrix, vector = self.get_new_genome(choice(close_agents))
         new_agent = Agent((self.parent.x, self.parent.y), self.parent.environment, decision_matrix= matrix, genome= vector, species = self.parent.group_id)
         energy_level = self.parent.energy / self.parent.max_energy
@@ -19,18 +24,20 @@ class Mating:
         self.parent.energy /= 2
         self.parent.environment.create_agent(new_agent)
 
-
-    def _get_nearby_agents(self):
+    def _get_nearby_agents(self) -> typing.List[Agent]:
+        """Find nearby agents of the same group within mating range."""
         close_agents: typing.List[Agent] = []
         for agent in self.parent.environment.get_agents():
             if dist2(self.parent.x, self.parent.y, agent.x, agent.y) < config.MAX_RANGE and agent.group_id == self.parent.group_id:
                 close_agents.append(agent)
         return close_agents
 
-    def _checking_constrains(self):
+    def _checking_constrains(self) -> bool:
+        """Check if parent meets mating requirements (age and energy thresholds)."""
         return not( self.parent.age < config.MIN_AGE_PERCENT * self.parent.max_age or self.parent.energy < config.MIN_ENERGY_LEVEL * self.parent.max_energy)
         
-    def get_new_genome(self, second : Agent):
+    def get_new_genome(self, second : Agent) -> typing.Tuple[typing.List[typing.List[float]], typing.Dict[str, int]]:
+        """Generate offspring genome by crossing over parent genomes and applying mutations."""
         matrix =  self.create_new_decision_matrix(second)
         vector = self.create_new_genome_vector(second)
 
@@ -62,7 +69,8 @@ class Mating:
 
         return matrix, vector
     
-    def create_new_decision_matrix(self, second : Agent):
+    def create_new_decision_matrix(self, second : Agent) -> typing.List[typing.List[float]]:
+        """Perform two-point crossover on neural network weights."""
         output = []
         crossover_points = [randint(1, len(self.parent.weights[0])-1) for _ in range(2)]
         crossover_points.sort()

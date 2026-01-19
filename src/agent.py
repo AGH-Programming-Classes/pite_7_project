@@ -1,6 +1,5 @@
 """Agent module containing the Agent class and related utilities for simulation."""
 from __future__ import annotations
-from food import FoodSource
 import math
 import random
 import pygame
