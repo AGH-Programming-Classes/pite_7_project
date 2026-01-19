@@ -5,7 +5,6 @@ import time
 import random
 from typing import List, Tuple
 import pygame
-from tomlkit import value
 from food import FoodSource, SimpleGrassPatch, Food, BerryBush, FertileFruitTree, CactusPads
 from agent import Agent
 from area import Area
