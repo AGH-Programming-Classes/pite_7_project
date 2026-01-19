@@ -272,11 +272,26 @@ class Environment:
         if self.simulation_thread.is_alive():
             self.simulation_thread.join(timeout=1.0)
 
+    def reset(self):
+        with self.data_lock:
+            self.tick_counter = 0
+            self.food_sources = []
+            self.food_items = []
+            self.agents = []
+            self.area_food_sources = {
+                area: 0 for area in Area
+            }
+            self._spawn_initial_food_sources()
+            self._spawn_initial_agents()
+
+
     def pause(self):
-        self.pause_sim = True
+        with self.data_lock:
+            self.pause_sim = True
 
     def resume(self):
-        self.pause_sim = False
+        with self.data_lock:
+            self.pause_sim = False
 
     def get_agents(self):
         return self.agents
