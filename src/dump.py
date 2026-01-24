@@ -81,28 +81,27 @@ def dump(config_template, dump_conf):
 
 
 def save_averaged_results(tag):
-    all_values = []
-    for i in range(REPEAT_CONF):
-        file_path = os.path.join("dump", tag, f"{tag}_{i}.txt")
-        
-        if os.path.exists(file_path):
-            with open(file_path, "r") as f:
-                line = f.read().strip()
-                if line:
-                    values = [float(x) for x in line.split()]
-                    all_values.append(values)
-        else:
-            print(f"Error: File not found {file_path}")
+    sums = []
 
-    if not all_values:
-        return
+    for run in range(REPEAT_CONF):
+        file_path = os.path.join("dump", tag, f"{tag}_{run}.txt")
+        with open(file_path, "r") as f:
+            for i, line in enumerate(f):
+                if not line.strip(): continue
+                values = [float(x) for x in line.split()]
+                if run == 0:
+                    sums.append(values)
+                else:
+                    for j in range(len(values)):
+                        sums[i][j] += values[j]
 
-    averages = [sum(col) / len(col) for col in zip(*all_values)]
+
     avg_file_path = os.path.join("dump", tag, f"{tag}_avg.txt")
     with open(avg_file_path, "w") as f:
-        line_to_save = " ".join(f"{val:.2f}" for val in averages)
-        f.write(line_to_save)
-        f.write('\n')
+        for row in sums:
+            avg = [val / REPEAT_CONF for val in row]
+            line_to_save = " ".join(f"{val:.2f}" for val in avg)
+            f.write(f"{line_to_save}\n")
 
 
 if __name__ == "__main__":

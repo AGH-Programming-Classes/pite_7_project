@@ -29,7 +29,7 @@ if config.DUMP:
         print('\r\033[K', end='\r')
         print(f"tick: {tick} / {config.MAX_TICK} ({tick * 100 // config.MAX_TICK}%), tick / s = {round(tick_diff / dt, 2)}, time: {round(t, 3)} s", end='')
 
-        if env.tick_counter >= config.MAX_TICK:
+        if tick > config.MAX_TICK:
             env.shutdown()
         time.sleep(0.5)
     print()
