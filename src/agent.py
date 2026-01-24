@@ -77,10 +77,8 @@ class Agent:
 
 
     actions = {"ACTION_MOVE" : 0,
-    "ACTION_IDLE" : 1,
-    "ACTION_FLEE" : 2,
-    "ACTION_MATE" : 3,
-    "ACTION_ATTACK" : 4}
+    "ACTION_MATE" : 1,
+    "ACTION_ATTACK" : 2}
 
     body_points_total = 100
 
@@ -89,9 +87,11 @@ class Agent:
 
     def __init__(self, position: tuple, environment : Environment,/, decision_matrix : typing.List[typing.List[int]] = None, genome = None, species = None ):
         from mating import Mating
+        from sense import Sense
 
         self.environment = environment
         self.mate_module :Mating = Mating(self)
+        self.sense_module : Sense = Sense(self)
         self.x = float(position[0])
         self.y = float(position[1])
 
@@ -106,7 +106,7 @@ class Agent:
 
         self.max_hp = 10.0 + _sqrt_scale(self.body_points["hp"], 2.0)
         self.max_energy = (10.0 + _sqrt_scale(self.body_points["energy"], 2.0)) * 2
-        self.base_speed = 0.5 + _sqrt_scale(self.body_points["speed"], 0.2)
+        self.base_speed = 0.70+ _sqrt_scale(self.body_points["speed"], 0.28)
         self.attack_power = 0.5 + _sqrt_scale(self.body_points["attack"], 0.06)
         self.max_age = int((300 + _sqrt_scale(self.body_points["lifespan"], 18.0)) * 2.5)
         self.sight = 70.0 + _sqrt_scale(self.body_points["sight"], 6.0)
@@ -116,17 +116,18 @@ class Agent:
         self.energy = self.max_energy
         self.age = 0
 
-        self.angle = random.random() * 360.0
         self.last_action = self.actions["ACTION_MOVE"]
 
         self.input_size = len(self.sense())
         self.action_count = len(self.actions)
         self.output_size = self.action_count + 2
+        self.angle = random.random() * 360
 
         if decision_matrix:
             self.weights = decision_matrix
         else:
             self.weights = self._random_matrix(self.input_size, self.output_size, scale=0.6)
+
 
 
         self._inputs_override = None
@@ -155,134 +156,13 @@ class Agent:
         self._inputs_override = [float(v) for v in inputs]
 
     def sense(self, foods=None, agents=None):
-        """Generate normalized sensory input vector."""
-        bx = float(self.bound_x) if self.bound_x > 0 else 1.0
-        by = float(self.bound_y) if self.bound_y > 0 else 1.0
-
-        hp_n = _clamp(self.hp / max(1e-9, self.max_hp), 0.0, 1.0)
-        en_n = _clamp(self.energy / max(1e-9, self.max_energy), 0.0, 1.0)
-        age_n = _clamp(self.age / max(1, self.max_age), 0.0, 1.0)
-
-        x_n = _clamp(self.x / max(1e-9, bx), 0.0, 1.0)  # normalized position
-        y_n = _clamp(self.y / max(1e-9, by), 0.0, 1.0)
-
-        ang = math.radians(self.angle)
-        head_x = math.cos(ang)  # facing direction (unit vector)
-        head_y = -math.sin(ang)
-
-        food_d_n, food_dx_n, food_dy_n, food_in_sight = 1.0, 0.0, 0.0, 0
-        if foods:
-            best_d2 = 1e18
-            best = None
-            for f in foods:
-                fx = float(getattr(f, "x", 0.0))
-                fy = float(getattr(f, "y", 0.0))
-                d2 = dist2(self.x, self.y, fx, fy)
-                if d2 < best_d2:
-                    best_d2 = d2
-                    best = (fx, fy)
-            if best is not None:
-                dx, dy = torus_diff(self.x, self.y, best[0], best[1])
-                d = math.sqrt(best_d2)
-                food_d_n = _clamp(d / max(1e-9, self.sight), 0.0, 1.0)
-                food_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
-                food_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
-                self._last_food = best
-                if d <= self.sight: # Adding boolean to deal with semantic discontinuity ( 1 could mean food is far away and 0,95 mean is really close)
-                    food_in_sight = 1
-
-        friend_count_n = 0.0
-        friend_d_n, friend_dx_n, friend_dy_n = 1.0, 0.0, 0.0
-        enemy_count_n = 0.0
-        enemy_d_n, enemy_dx_n, enemy_dy_n = 1.0, 0.0, 0.0
-
-        if agents:
-            r2 = self.sight * self.sight
-            friends = 0
-            enemies = 0
-            best_friend_d2 = 1e18
-            best_friend = None 
-            best_enemy_d2 = 1e18
-            best_enemy = None
-
-            for a in agents:
-                if a is self:
-                    continue
-                ax = float(getattr(a, "x", 0.0))
-                ay = float(getattr(a, "y", 0.0))
-                d2 = dist2(self.x, self.y, ax, ay)
-                if d2 > r2:
-                    continue
-
-                same_group = getattr(a, "group_id", None) == self.group_id
-                if same_group:
-                    friends += 1
-                    if d2 < best_friend_d2:
-                        best_friend_d2 = d2
-                        best_friend = (ax, ay)
-                else:
-                    enemies += 1
-                    if d2 < best_enemy_d2:
-                        best_enemy_d2 = d2
-                        best_enemy = (ax, ay)
-
-            friend_count_n = _clamp(friends / 10.0, 0.0, 1.0)
-            enemy_count_n = _clamp(enemies / 10.0, 0.0, 1.0)
-
-            if best_enemy is not None:
-                dx, dy = torus_diff(self.x, self.y, best_enemy[0], best_enemy[1])
-                d = math.sqrt(best_enemy_d2)
-                enemy_d_n = _clamp(d / max(1e-9, self.sight), 0.0, 1.0)
-                enemy_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
-                enemy_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
-                self._last_enemy = best_enemy
-            else:
-                self._last_enemy = None
-
-            
-            if best_friend is not None: # Adding this part to enable to agent getting information where are friends
-                dx, dy = torus_diff(self.x, self.y, best_friend[0], best_friend[1])
-                d = math.sqrt(best_friend_d2)
-                friend_d_n = _clamp(d / max(1e-9, self.sight), 0.0, 1.0)
-                friend_dx_n = _clamp(dx / max(1e-9, self.sight), -1.0, 1.0)
-                friend_dy_n = _clamp(dy / max(1e-9, self.sight), -1.0, 1.0)
-                self._last_friend = best_friend
-            else:
-                self._last_friend = None
-
-        cell = self.environment._get_agent_area(self)
-        if cell == Area.PLAINS: ground = 0
-        elif cell == Area.FERTILE_VALLEY: ground = 0.9
-        elif cell == Area.DESERT: ground = 0.1
-        elif cell == Area.BERRY_CORNER: ground= 1
-        else: raise ValueError(f"Wrong place! {cell}, {type(cell)}")
-
-        return [
-            hp_n,
-            en_n,
-            age_n,
-            x_n,
-            y_n,
-            head_x,
-            head_y,
-            food_d_n,
-            food_dx_n,
-            food_dy_n,
-            food_in_sight,
-            friend_count_n,
-            friend_d_n,
-            friend_dx_n,
-            friend_dy_n,
-            enemy_count_n,
-            enemy_d_n,
-            enemy_dx_n,
-            enemy_dy_n,
-            ground,
-            1.0
-        ]
+        return self.sense_module.sense(foods, agents)
 
     def think(self, inputs):
         """Forward pass through neural network."""
+
+
+
         out = [0.0 for _ in range(self.output_size)]
         for i in range(self.input_size):
             xi = inputs[i]
@@ -305,51 +185,51 @@ class Agent:
         intensity = outputs[self.action_count + 1]
         return best_i, turn, intensity
 
-    def _apply_bounds(self, new_x: float, new_y: float, new_angle: float):
-        """Apply torus effect (link right to left and top to bottom)."""
-        bx = float(self.bound_x)
-        by = float(self.bound_y)
-        if bx <= 0 or by <= 0:
-            self.x, self.y, self.angle = new_x, new_y, new_angle % 360.0
-            return
-
-        max_x = max(0.0, bx - 1e-6)
-        max_y = max(0.0, by - 1e-6)
-
-        self.x = (new_x + bx) % max_x
-        self.y = (new_y + by) % max_y
-        self.angle = new_angle % 360.0
 
     def _move(self, turn: float, intensity: float, speed_modifier: float = 1.0):
-        turn_delta = turn * (self.agility * 0.5)
-        new_angle = self.angle + turn_delta
+
+        turn = (turn + 1) * math.pi
 
         inten = _clamp(0.5 + 0.5 * intensity, 0.0, 1.0)
         sp = self.base_speed * (0.20 + 1.30 * inten) * speed_modifier
 
-        rad = math.radians(new_angle)
-        new_x = self.x + math.cos(rad) * sp
-        new_y = self.y - math.sin(rad) * sp
-        self._apply_bounds(new_x, new_y, new_angle)
+        self.x = (self.x + math.cos(turn) * sp) % (self.environment.grid_width * self.environment.cell_size)
+        self.y = (self.y - math.sin(turn) * sp) % (self.environment.grid_height * self.environment.cell_size)
 
-        cost = 0.01 + 0.05 * inten
+        cost = 0.0075 + 0.035 * inten
         self.energy = max(0.0, self.energy - cost)
 
-    def _idle(self):
-        self.energy = min(self.max_energy, self.energy - 0.01)
+        self.angle = math.degrees(turn)
 
-    def _flee(self, turn: float, intensity: float):
-        if self._last_enemy is None:
-            self._move(turn, intensity)
-            return
-        ex, ey = self._last_enemy
-        dx, dy = torus_diff(ex, ey, self.x, self.y)
-        ang = math.degrees(math.atan2(-dy, dx))
-        self.angle = ang % 360.0
-        self._move(0.0, max(0.2, intensity))
+
 
     def _attack(self):
-        self.energy = max(0.0, self.energy - 0.08)
+        self.energy = max(0.0, self.energy - 0.16)
+        agents = self.environment.agents
+        if agents:
+            r2 = self.sight * self.sight
+            best_enemy_d2 = 1e18
+            best_enemy = None
+
+            for a in agents:
+                if a is self:
+                    continue
+                ax = float(getattr(a, "x", 0.0))
+                ay = float(getattr(a, "y", 0.0))
+                d2 = dist2(self.x, self.y, ax, ay)
+                if d2 > r2:
+                    continue
+                same_group = getattr(a, "group_id", None) == self.group_id
+                if same_group:
+                    continue
+                else:
+                    if d2 < best_enemy_d2:
+                        best_enemy_d2 = d2
+                        best_enemy : Agent = a
+            if best_enemy:
+                best_enemy.hp -= self.attack_power
+
+            
 
     def _mate(self):
         self.mate_module.mate()
@@ -378,23 +258,19 @@ class Agent:
 
         outputs = self.think(inputs)
         action, turn, intensity = self.decide(outputs)
-        self.last_action = action
 
         if action == self.actions["ACTION_MOVE"]:
             self.logger.debug(f"Agent - {self.uuid}; action - move")
             self._move(turn, intensity)
-        elif action == self.actions["ACTION_IDLE"]:
-            self.logger.debug(f"Agent - {self.uuid}; action - idle")
-            self._idle()
-        elif action == self.actions["ACTION_FLEE"]:
-            self.logger.debug(f"Agent - {self.uuid}; action - free")
-            self._flee(turn, intensity)
         elif action == self.actions["ACTION_MATE"]:
             self.logger.debug(f"Agent - {self.uuid}; action - mate")
             self._mate()
         else:
             self.logger.debug(f"Agent - {self.uuid}; action - attack")
             self._attack()
+
+        self.last_action = action / 3
+
 
         self._tick_body()
 
