@@ -102,6 +102,7 @@ def save_averaged_results(tag):
     with open(avg_file_path, "w") as f:
         line_to_save = " ".join(f"{val:.2f}" for val in averages)
         f.write(line_to_save)
+        f.write('\n')
 
 
 if __name__ == "__main__":
