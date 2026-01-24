@@ -10,6 +10,7 @@ from agent import Agent
 from area import Area
 from terrain import generate_terrain
 from typing import Type
+import config
 
 class Environment:
     """
@@ -127,11 +128,12 @@ class Environment:
 
 
     def _spawn_initial_food_sources(self):
+        food_count = config.INITIAL_FOOD_COUNT // 4
         spawn_plan = {
-            Area.PLAINS: (SimpleGrassPatch, 4),
-            Area.FERTILE_VALLEY: (FertileFruitTree, 3),
-            Area.DESERT: (CactusPads, 3),
-            Area.BERRY_CORNER: (BerryBush, 3),
+            Area.PLAINS: (SimpleGrassPatch, food_count),
+            Area.FERTILE_VALLEY: (FertileFruitTree, food_count),
+            Area.DESERT: (CactusPads, food_count),
+            Area.BERRY_CORNER: (BerryBush, food_count),
         }
 
         for area, (cls, desired_count) in spawn_plan.items():
@@ -164,7 +166,7 @@ class Environment:
         Agent.bound_y = self.pixel_height
         Agent.cell_size = self.cell_size
 
-        for _ in range(500):
+        for _ in range(config.INITIAL_AGENT_COUNT):
             pos_x = random.randint(0, Agent.bound_x)
             pos_y = random.randint(0, Agent.bound_y)
             agent = Agent((pos_x, pos_y), self)
@@ -204,7 +206,11 @@ class Environment:
 
     def _simulation_loop(self):
         while self.running:
-            time.sleep(0.01 / self.sim_speed)
+            if config.DUMP == False:
+                time.sleep(0.01 / self.sim_speed)
+            elif self.tick_counter <= config.MAX_TICK:
+                with open(config.FILE_NAME, 'a') as f:
+                    f.write(f"{self.tick_counter} {self.agent_count()} {round(self.average_agent_health(), 3)} {round(self.average_agent_energy(), 3)} {self.food_sources_with_stock()} {round(self.total_food_stock(), 3)}\n")
 
             if self.pause_sim:
                 continue

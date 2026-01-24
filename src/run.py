@@ -8,12 +8,37 @@ from food import FoodSource
 from ui import UI
 import charts
 from agent import Agent
+import time
+
+env = Environment(
+    grid_width=config.GRID_WIDTH,
+    grid_height=config.GRID_HEIGHT,
+    pixel_width=config.PANEL_WIDTH,
+    pixel_height=config.PANEL_HEIGHT
+)
+
+clock = pygame.time.Clock()
+if config.DUMP:
+    tick = 0
+    t = 0
+    while env.running:
+        dt = clock.tick(60) / 1000.0
+        tick_diff = env.tick_counter - tick
+        tick = env.tick_counter
+        t += dt
+        print('\r\033[K', end='\r')
+        print(f"tick: {tick} / {config.MAX_TICK} ({tick * 100 // config.MAX_TICK}%), tick / s = {round(tick_diff / dt, 2)}, time: {round(t, 3)} s", end='')
+
+        if env.tick_counter >= config.MAX_TICK:
+            env.shutdown()
+        time.sleep(0.5)
+    print()
+    exit()
 
 pygame.init()
 pygame.display.set_caption("Simulation")
 screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
 
-clock = pygame.time.Clock()
 manager = pygame_gui.UIManager((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
 hint_font = pygame.font.Font(None, 22)
 
@@ -39,13 +64,6 @@ env_ui = UI(
     y=0,
     width=config.WINDOW_WIDTH - (config.PANEL_WIDTH + 2*config.PANEL_X),
     height=config.WINDOW_HEIGHT
-)
-
-env = Environment(
-    grid_width=config.GRID_WIDTH,
-    grid_height=config.GRID_HEIGHT,
-    pixel_width=config.PANEL_WIDTH,
-    pixel_height=config.PANEL_HEIGHT
 )
 
 chart_rect = pygame.Rect(

@@ -17,3 +17,10 @@ mating:
   mutation_chance: 0.05
   mutation_multiply_border: 0.1
   mutation_addding_border: 0.1
+environment:
+  initial_agent_count: 500
+  initial_food_count: 12
+dump:
+  dump: false
+  file_name: null
+  max_tick: 3000

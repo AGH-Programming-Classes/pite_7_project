@@ -25,3 +25,10 @@ MAX_RANGE = cfg["mating"]["max_range"]
 MUTATION_CHANCE = cfg["mating"]["mutation_chance"]
 MUTATION_MULTIPLY_BORDER = cfg["mating"]["mutation_multiply_border"] 
 MUTATION_ADDING_BORDER = cfg["mating"]["mutation_addding_border"]
+
+INITIAL_AGENT_COUNT = cfg["environment"]["initial_agent_count"]
+INITIAL_FOOD_COUNT = cfg["environment"]["initial_food_count"]
+
+DUMP = cfg["dump"]["dump"]
+FILE_NAME = cfg["dump"]["file_name"]
+MAX_TICK = cfg["dump"]["max_tick"]
