@@ -49,9 +49,9 @@ class Mating:
             row =choice(matrix)
             i = randint(0, len(row)-1)
             if random() < 0.2:
-                row[i] *= uniform(1 - config.MUTATION_ADDING_BORDER, 1 + config.MUTATION_ADDING_BORDER)
+                row[i] *= uniform(1 - config.MUTATION_MULTIPLY_BORDER, 1 + config.MUTATION_MULTIPLY_BORDER)
             else:
-                row[i] += uniform(-config.MUTATION_MULTIPLY_BORDER, config.MUTATION_MULTIPLY_BORDER)
+                row[i] += uniform(-config.MUTATION_ADDING_BORDER, config.MUTATION_ADDING_BORDER)
 
         for _ in range(int(len(vector) / (1 / config.MUTATION_CHANCE))):
             item = choice(vector.keys())
