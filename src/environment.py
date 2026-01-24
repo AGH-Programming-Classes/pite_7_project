@@ -210,7 +210,7 @@ class Environment:
                 time.sleep(0.01 / self.sim_speed)
             elif self.tick_counter <= config.MAX_TICK:
                 with open(config.FILE_NAME, 'a') as f:
-                    f.write(f"{self.tick_counter} {self.agent_count()} {round(self.average_agent_health(), 3)} {round(self.average_agent_energy(), 3)} {self.food_sources_with_stock()} {round(self.total_food_stock(), 3)}\n")
+                    f.write(f"{self.tick_counter} {self.agent_count()} {self.average_agent_health():.2f} {self.average_agent_energy():.2f} {self.food_sources_with_stock()} {self.total_food_stock():.2f}\n")
 
             if self.pause_sim:
                 continue
