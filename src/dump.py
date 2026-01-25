@@ -22,6 +22,14 @@ import os
 
 REPEAT_CONF = 5
 
+COLUMNS = {
+    "Agent count": 2,
+    "Average agent health": 3,
+    "Average agent energy": 4,
+    "Food sources with stock": 5,
+    "Total food in environment": 6
+}
+
 dump_conf_list = [
     {
         "tag": "default",
@@ -29,7 +37,7 @@ dump_conf_list = [
     {
         "tag": "high_mutation",
         "mating": {
-            "mutation_chance": 0.15,
+            "mutation_chance": 0.10,
         },
     },
     {
@@ -76,7 +84,7 @@ def dump(config_template, dump_conf):
         current_conf['dump']['file_name'] = file_path
         with open("config.yaml", "w") as f:
             yaml.dump(current_conf, f)
-        print(f">>> START: {dump_conf['tag']} {i+1}/{REPEAT_CONF}")
+        print(f"\n>>> START: {dump_conf['tag']} {i+1}/{REPEAT_CONF}")
         subprocess.run(["python", "-u", "src/run.py"])
 
 
@@ -103,6 +111,37 @@ def save_averaged_results(tag):
             line_to_save = " ".join(f"{val:.2f}" for val in avg)
             f.write(f"{line_to_save}\n")
 
+def cleanup(tag):
+    filename = f"{tag}_avg.txt"
+    dump_dir = os.path.join("dump", tag)
+    file_path = os.path.join(dump_dir, filename)
+    os.rename(file_path, os.path.join("dump", filename))
+    shutil.rmtree(dump_dir)
+    
+def generate_comparison_plots():
+    # Dla każdego rodzaju danych tworzymy osobny wykres
+    if os.path.exists("plots"):
+        shutil.rmtree("plots")
+    os.makedirs("plots")
+    for data_name, col_idx in COLUMNS.items():
+        plt_file_path = os.path.join("plots", f"{data_name.replace(' ', '_')}.plt")
+        
+        with open(plt_file_path, "w") as f:
+            # f.write("set terminal pdf\n")
+            f.write(f"set title 'Comprasion: {data_name}'\n")
+            f.write("set xlabel 'Simulation Tick'\n")
+            f.write(f"set ylabel '{data_name}'\n")
+            f.write("set grid\n")
+            f.write("set key outside right center\n")
+            
+            plot_commands = []
+            for i, dump_conf in enumerate(dump_conf_list):
+                tag = dump_conf['tag']
+                file_path = os.path.join("dump", f"{tag}_avg.txt")
+                if os.path.exists(file_path):
+                    plot_commands.append(f"'{file_path}' using 1:{col_idx} with lines title '{tag.replace('_', ' ')}' lw 2 lt {i+1}")
+            
+            f.write("plot " + ",\\\n     ".join(plot_commands) + "\n")
 
 if __name__ == "__main__":
     if not os.path.exists("config.yaml"):
@@ -120,6 +159,8 @@ if __name__ == "__main__":
         print(f"\n--- Processing: {i+1}/{len(dump_conf_list)} ---")
         dump(base_template, dump_conf)
         save_averaged_results(dump_conf['tag'])
+        cleanup(dump_conf['tag'])
+    generate_comparison_plots()
 
     with open("config.yaml", "w") as f:
         yaml.dump(base_template, f, sort_keys=False)
