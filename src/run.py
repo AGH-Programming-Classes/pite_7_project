@@ -19,19 +19,22 @@ env = Environment(
 
 clock = pygame.time.Clock()
 if config.DUMP:
-    tick = 0
-    t = 0
+    start = time.time()
+    prev_tick = 0
+    prev_time = start
     while env.running:
-        dt = clock.tick(60) / 1000.0
-        tick_diff = env.tick_counter - tick
-        tick = env.tick_counter
-        t += dt
+        current_time = time.time()
+        current_tick = env.tick_counter
+        delta_tick = current_tick - prev_tick
+        delta_time = current_time - prev_time
         print('\r\033[K', end='\r')
-        print(f"tick: {tick} / {config.MAX_TICK} ({tick * 100 // config.MAX_TICK}%), tick / s = {round(tick_diff / dt, 2)}, time: {round(t, 3)} s", end='')
+        print(f"tick: {current_tick} / {config.MAX_TICK} ({current_tick * 100 // config.MAX_TICK}%), tick / s = {delta_tick / delta_time:.2f}, time: {current_time - start:.2f} s", end='')
 
-        if tick > config.MAX_TICK:
+        if current_tick > config.MAX_TICK:
             env.shutdown()
         time.sleep(0.5)
+        prev_tick = current_tick
+        prev_time = current_time
     print()
     exit()
 
