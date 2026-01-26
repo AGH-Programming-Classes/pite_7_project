@@ -118,6 +118,15 @@ class Agent:
 
         self.last_action = self.actions["ACTION_MOVE"]
 
+        self.signal_active = False
+        self.signal_timer = 0
+        self.signal_duration = 20
+        self.signal_range = 50.0
+
+        self.suggested_action = None
+        self.suggested_action_timer = 0
+        self.suggested_action_duration = 50
+
         self.input_size = len(self.sense())
         self.action_count = len(self.actions)
         self.output_size = self.action_count + 2
@@ -228,11 +237,28 @@ class Agent:
                         best_enemy : Agent = a
             if best_enemy:
                 best_enemy.hp -= self.attack_power
-
+                best_enemy.signal()
             
 
     def _mate(self):
         self.mate_module.mate()
+
+    def signal(self):
+        """Send signal to call nearby teammates for help."""
+        self.signal_active = True
+        self.signal_timer = self.signal_duration
+        
+        nearby_agents = self.environment.get_nearby_agents(self, self.signal_range)
+        same_species = [agent for agent in nearby_agents 
+                       if agent is not self and agent.group_id == self.group_id]
+        
+        affected_agents = random.sample(same_species, min(3, len(same_species)))
+        
+        for agent in affected_agents:
+            agent.signal_active = True
+            agent.signal_timer = self.signal_duration
+            agent.suggested_action = self.actions["ACTION_MOVE"]
+            agent.suggested_action_timer = agent.suggested_action_duration
 
 
     def _tick_body(self):
@@ -242,6 +268,16 @@ class Agent:
             self.hp = max(0.0, self.hp - 0.03)
         if self.age >= self.max_age:
             self.hp = 0.0
+        
+        if self.signal_active and self.signal_timer > 0:
+            self.signal_timer -= 1
+        if self.signal_timer <= 0:
+            self.signal_active = False
+        
+        if self.suggested_action_timer > 0:
+            self.suggested_action_timer -= 1
+        if self.suggested_action_timer <= 0:
+            self.suggested_action = None
 
     def is_alive(self) -> bool:
         return self.hp > 0.0 and self.energy > 0
@@ -261,7 +297,7 @@ class Agent:
 
         if action == self.actions["ACTION_MOVE"]:
             self.logger.debug(f"Agent - {self.uuid}; action - move")
-            self._move(turn, intensity)
+            self._move(turn, intensity, speed_modifier)
         elif action == self.actions["ACTION_MATE"]:
             self.logger.debug(f"Agent - {self.uuid}; action - mate")
             self._mate()
