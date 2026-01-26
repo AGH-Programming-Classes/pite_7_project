@@ -17,6 +17,7 @@ class Mating:
         close_agents = self._get_nearby_agents()
         if not close_agents:
             return
+        
         matrix, vector = self.get_new_genome(choice(close_agents))
         new_agent = Agent((self.parent.x, self.parent.y), self.parent.environment, decision_matrix= matrix, genome= vector, species = self.parent.group_id)
         energy_level = self.parent.energy / self.parent.max_energy
@@ -65,7 +66,6 @@ class Mating:
         normalisation = 100 / sum(vector.values())
         for key,value in vector.items():
             vector[key] = value * normalisation
-
 
         return matrix, vector
     

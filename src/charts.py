@@ -154,21 +154,17 @@ def register_chart(name: str, value_name: str, callback: ChartCallback) -> Chart
     """Registers a chart to be sampled and rendered."""
     return _MANAGER.register_chart(name, value_name, callback)
 
-
 def update(dt: float) -> None:
     """Advances the polling timer."""
     _MANAGER.update(dt)
-
 
 def render(surface: pygame.Surface, rect: pygame.Rect) -> None:
     """Renders all registered charts inside the given rect."""
     _MANAGER.render(surface, rect)
 
-
 def scroll(dy: float) -> None:
     """Scrolls the chart viewport horizontally (dy is mouse wheel delta)."""
     _MANAGER.scroll(dy)
-
 
 def first_sample_age() -> float:
     """Returns seconds since the oldest datapoint across charts was sampled."""
