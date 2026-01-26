@@ -43,7 +43,6 @@ python3 src/run.py
 - **pygame** - Graphics and event handling
 - **pygame_gui** - UI components
 - **PyYAML** - Configuration file parsing
-- **python-i18n** - Internationalization support
 
 ## Configuration
 
