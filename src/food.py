@@ -7,7 +7,6 @@ import pygame
 
 class Food:
     """Represents a single piece of food that an agent can consume."""
-
     def __init__(self, position: tuple, value: int, food_type: str, expiry_time: int):
         self.x, self.y = position  # Grid position (x, y)
         self.value = value        # Energy provided
@@ -52,7 +51,6 @@ class FoodSource(ABC):
     def render(self, window, cell_size: int, food_items: list, panel_offset: tuple):
         """Renders the food source."""
 
-
     def destroy(self):
         """Marks the source as destroyed."""
         if not self.is_destroyed:
@@ -67,10 +65,9 @@ class FoodSource(ABC):
         if self.age >= self.lifespan:
             self.destroy()
 
-# Example
+
 class SimpleGrassPatch(FoodSource):
     """A simple herbivore food source that regenerates and periodically drops food."""
-
     FONT = None
 
     def __init__(self, position: tuple, area, env_area_counters):

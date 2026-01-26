@@ -169,9 +169,6 @@ class Agent:
 
     def think(self, inputs):
         """Forward pass through neural network."""
-
-
-
         out = [0.0 for _ in range(self.output_size)]
         for i in range(self.input_size):
             xi = inputs[i]
@@ -183,6 +180,7 @@ class Agent:
         return out
 
     def decide(self, outputs):
+        """Decide action, turn, and intensity from neural network outputs."""
         logits = outputs[: self.action_count]
         best_i = 0
         best_v = logits[0]
@@ -194,23 +192,15 @@ class Agent:
         intensity = outputs[self.action_count + 1]
         return best_i, turn, intensity
 
-
     def _move(self, turn: float, intensity: float, speed_modifier: float = 1.0):
-
         turn = (turn + 1) * math.pi
-
         inten = _clamp(0.5 + 0.5 * intensity, 0.0, 1.0)
         sp = self.base_speed * (0.20 + 1.30 * inten) * speed_modifier
-
         self.x = (self.x + math.cos(turn) * sp) % (self.environment.grid_width * self.environment.cell_size)
         self.y = (self.y - math.sin(turn) * sp) % (self.environment.grid_height * self.environment.cell_size)
-
         cost = 0.0075 + 0.035 * inten
         self.energy = max(0.0, self.energy - cost)
-
         self.angle = math.degrees(turn)
-
-
 
     def _attack(self):
         self.energy = max(0.0, self.energy - 0.16)
@@ -219,7 +209,6 @@ class Agent:
             r2 = self.sight * self.sight
             best_enemy_d2 = 1e18
             best_enemy = None
-
             for a in agents:
                 if a is self:
                     continue
@@ -238,7 +227,6 @@ class Agent:
             if best_enemy:
                 best_enemy.hp -= self.attack_power
                 best_enemy.signal()
-            
 
     def _mate(self):
         self.mate_module.mate()
@@ -259,7 +247,6 @@ class Agent:
             agent.signal_timer = self.signal_duration
             agent.suggested_action = self.actions["ACTION_MOVE"]
             agent.suggested_action_timer = agent.suggested_action_duration
-
 
     def _tick_body(self):
         self.age += 1
@@ -304,10 +291,7 @@ class Agent:
         else:
             self.logger.debug(f"Agent - {self.uuid}; action - attack")
             self._attack()
-
         self.last_action = action / 3
-
-
         self._tick_body()
 
     def render(self, window: pygame.window, cell_size: int, offset: tuple):

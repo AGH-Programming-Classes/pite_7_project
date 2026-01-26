@@ -117,13 +117,10 @@ class Sense:
         return ground
 
     def sense(self, foods=None, agents=None ):
-
-
         hp_n, en_n, age_n = self.get_agent_stats()
         food_sin, food_cos, food_distance, food_in_sight = self.get_closest_food(foods)
         friend_count_n, friend_cord_sin, friend_cord_cos, friend_distance, friend_in_sight, enemy_count_n, enemy_cord_sin, enemy_cord_cos, enemy_distance, enemy_in_sight = self.get_close_agents(agents)
         area_type = self.get_area_type()
-
 
         return [
             hp_n,

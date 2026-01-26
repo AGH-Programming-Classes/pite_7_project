@@ -17,7 +17,6 @@ clock = pygame.time.Clock()
 manager = pygame_gui.UIManager((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
 hint_font = pygame.font.Font(None, 22)
 
-
 def _format_first_sample_age() -> str:
     age = charts.first_sample_age()
     if age <= 0:
@@ -28,11 +27,11 @@ def _format_first_sample_age() -> str:
     seconds = int(age % 60)
     return f"Oldest sample is {minutes}m {seconds}s old"
 
-
 def _chart_hint_text() -> str:
     base = "Scroll over the chart area to pan charts"
     age_text = _format_first_sample_age()
     return f"{base} — {age_text}" if age_text else base
+
 env_ui = UI(
     manager=manager,
     x=config.PANEL_WIDTH + 2*config.PANEL_X,

@@ -125,7 +125,6 @@ class Environment:
             if self.terrain[y][x] == area
         ]
 
-
     def _spawn_initial_food_sources(self):
         spawn_plan = {
             Area.PLAINS: (SimpleGrassPatch, 4),
@@ -156,8 +155,6 @@ class Environment:
                     )
                 )
                 self.area_food_sources[area] += 1
-
-
 
     def _spawn_initial_agents(self):
         Agent.bound_x = self.pixel_width
@@ -264,7 +261,6 @@ class Environment:
                         new_agents.append(agent)
                 self.agents = new_agents
 
-
     def set_grid_cell(self, x: int, y: int, value: int):
         if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
             self.grid[y][x] = value
@@ -325,7 +321,6 @@ class Environment:
             }
             self._spawn_initial_food_sources()
             self._spawn_initial_agents()
-
 
     def pause(self):
         with self.data_lock:
